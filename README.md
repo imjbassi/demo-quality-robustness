@@ -7,6 +7,9 @@ evaluation tracks that damage.
 Fully code-based. No hardware, no robot time, no dataset licensing. The whole
 grid (78 training runs) takes about 13 minutes on a laptop CPU.
 
+**[Read the paper (PDF)](paper/paper.pdf)** for the full writeup with figures,
+tables and references. This README covers the same ground more briefly.
+
 ---
 
 ## The question
@@ -177,6 +180,10 @@ demo-quality-robustness/
 ├── run_experiment.py         grid runner        →  results/results.csv
 ├── analyze.py                stats and figures  →  results/findings.md, results/*.png
 │
+├── paper/
+│   ├── paper.tex             LaTeX source (two-column, self-contained, no bibtex)
+│   └── paper.pdf             compiled 4-page paper
+│
 └── results/                  committed, so the repo is readable without running anything
     ├── results.csv           raw per-run results (93 rows: mode, ρ, seed, both metrics)
     ├── findings.md           generated statistics tables
@@ -208,6 +215,13 @@ initial conditions are pinned to a single seed shared across every config, so
 runs are deterministic given the same PyTorch version. Results here were
 produced with torch 2.13 / numpy 2.4 on CPU; minor numeric drift across torch
 versions is expected and should not move any conclusion.
+
+To rebuild the paper (requires a LaTeX distribution; figures are pulled from
+`results/` by relative path, so compile from inside `paper/`):
+
+```bash
+cd paper && pdflatex paper.tex && pdflatex paper.tex
+```
 
 To change the sweep, edit the constants at the top of `run_experiment.py`
 (`N_EPISODES`, `EPOCHS`, `RHOS`, `SEEDS`). Per-episode corruption severity
