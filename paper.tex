@@ -55,7 +55,7 @@ Behaviour cloning is the workhorse of modern robot manipulation
 \cite{pomerleau1989alvinn}, and its central known weakness is compounding
 error: small action errors move the policy off the demonstration distribution,
 where its predictions degrade further \cite{ross2011dagger}. The standard
-responses to this are architectural or algorithmic---better policy classes
+responses to this are architectural or algorithmic: better policy classes
 \cite{chi2023diffusion}, or interactive data collection.
 
 Practitioners running data-collection pipelines know something the literature
@@ -69,8 +69,8 @@ quality-control effort spent on one is effort not spent on another.
 Prior work has established that demonstration quality matters in aggregate
 \cite{mandlekar2021what,belkhale2023data}. What is less established is a
 \emph{ranking}: given finite QC budget, which defect should a pipeline
-prioritise? And---because closed-loop evaluation is expensive and open-loop
-action-prediction error is cheap---does the cheap metric even detect the
+prioritise? And, because closed-loop evaluation is expensive and open-loop
+action-prediction error is cheap, does the cheap metric even detect the
 damage?
 
 This paper answers both questions in a deliberately small, fully controlled
@@ -135,7 +135,7 @@ Each mode produces demonstrations that a real pipeline could plausibly log:
 
 \textbf{Occlusion.} A contiguous window covering 35\% of timesteps has its
 observations frozen at the last visible frame. Actions remain
-expert-quality---the demonstrator can see, the camera cannot. The resulting
+expert-quality; the demonstrator can see, the camera cannot. The resulting
 transitions have corrupted inputs and pristine labels.
 
 \textbf{Accidental success.} Rollouts from the naive controller, keeping only
@@ -146,7 +146,7 @@ the episode.
 after which the demonstrator settles into correct motion and still succeeds.
 
 \textbf{Truncation.} A clean episode cut at 70\% of its length and logged
-anyway---what a QC filter missing a premature stop looks like.
+anyway, what a QC filter missing a premature stop looks like.
 
 \textbf{Inconsistent strategy.} Complete episodes from the alternate expert.
 Every one is a genuine success; the only defect is disagreement with the
@@ -156,7 +156,7 @@ primary strategy about what to do in a given state.
 
 \textbf{Action-level corruptions are re-simulated, not pasted.} Overwriting
 actions in a logged trajectory without re-running the dynamics yields
-observations that no longer follow from the actions---a physically impossible
+observations that no longer follow from the actions, a physically impossible
 episode. That measures label noise, not bad demonstrations. Every mode that
 touches actions replays the episode through the environment.
 
@@ -181,7 +181,7 @@ variable.
 
 Two metrics are recorded per policy. \textbf{Open-loop MSE} is
 action-prediction error against the expert on held-out \emph{clean} expert
-states---cheap, offline, no environment interaction. \textbf{Closed-loop
+states (cheap, offline, no environment interaction). \textbf{Closed-loop
 success rate} runs the policy in the environment over 200 episodes with
 initial conditions pinned to a single seed shared across every configuration.
 
@@ -233,7 +233,7 @@ Occlusion (stale obs)  & 0.910 & 0.867 & $-0.58$ \\
 Inconsistent strategy  & 0.933 & 0.303 & $-0.90$ \\
 Accidental success     & 0.965 & \textbf{0.012} & $-0.94$ \\
 \midrule
-\textit{Clean baseline} & \multicolumn{2}{c}{\textit{0.972}} & --- \\
+\textit{Clean baseline} & \multicolumn{2}{c}{\textit{0.972}} & n/a \\
 \bottomrule
 \end{tabular}
 \caption{Closed-loop success rate by failure mode and contamination rate, mean
@@ -265,8 +265,8 @@ Broken out by failure mode, the same correlation ranges from $-0.15$
 offline metric carries essentially no signal about closed-loop behaviour.
 
 The clearest statement of the problem is a matched comparison. Among the 15
-runs whose open-loop MSE falls in $[0.20, 0.30]$---indistinguishable on the
-offline metric---closed-loop success ranges from $\mathbf{0.315}$ to
+runs whose open-loop MSE falls in $[0.20, 0.30]$ (indistinguishable on the
+offline metric), closed-loop success ranges from $\mathbf{0.315}$ to
 $\mathbf{0.980}$. Figure~\ref{fig:scatter} shows the full picture: the pooled
 correlation is carried largely by a few high-MSE collapse points, while the
 bulk of the runs form a wide vertical band in which open-loop MSE is
@@ -289,7 +289,7 @@ construction. The data does not support this, and the control is worth stating
 explicitly because it nearly produced a false positive.
 
 At $\rho=1.0$ the dataset is entirely alternate-strategy and therefore fully
-self-consistent---there is no mixing left to blame. Success there ($0.303$) is
+self-consistent; there is no mixing left to blame. Success there ($0.303$) is
 the \emph{clonability floor} of that strategy, not evidence of inconsistency
 harm. Both experts solve the task on 100\% of episodes; the alternate is
 simply harder to clone, having a longer horizon and more orbit steps over
@@ -329,7 +329,7 @@ is a considerably more modest one than the raw figure suggests.
 
 \section{Limitations}
 
-\textbf{Three seeds is thin.} Some cells are noisy---occlusion at $\rho=1.0$
+\textbf{Three seeds is thin.} Some cells are noisy: occlusion at $\rho=1.0$
 spans $0.735$ to $0.955$ across seeds. Any number quoted from this work should
 be replicated at ten seeds first.
 
@@ -357,7 +357,7 @@ well-allocated uniformly across defect types.
 
 The evaluation finding is the more general one. Open-loop action-prediction
 error looks like a defensible screening metric in aggregate and is unreliable
-within failure modes---meaning that its aggregate correlation is exactly the
+within failure modes, meaning that its aggregate correlation is exactly the
 kind of evidence that would lead a team to trust it and then be surprised.
 Screening a policy offline is not the same as knowing it works.
 
