@@ -1,7 +1,7 @@
 # Not All Bad Demonstrations Are Equally Bad
 
 A controlled simulation study of how specific demonstration-quality failure
-modes degrade closed-loop policy performance — and how badly open-loop
+modes degrade closed-loop policy performance, and how badly open-loop
 evaluation tracks that damage.
 
 Fully code-based. No hardware, no robot time, no dataset licensing. The whole
@@ -18,9 +18,9 @@ same hyperparameters, same dataset size, same evaluation initial conditions.
 
 Two things get measured for every policy:
 
-- **open-loop MSE** — action-prediction error against the expert on held-out
+- **open-loop MSE**: action-prediction error against the expert on held-out
   *clean* expert states. Cheap, offline, no environment interaction.
-- **closed-loop success rate** — actually run the policy and see if the block
+- **closed-loop success rate**: actually run the policy and see if the block
   reaches the goal. Expensive, and the thing anyone actually cares about.
 
 ---
@@ -28,8 +28,8 @@ Two things get measured for every policy:
 ## Setup
 
 **Task.** `Push2D`: a 2D block-pushing task, fully vectorized in numpy. Pushing
-was chosen over reaching because it has a *staging* requirement — the gripper
-must get behind the block before pushing — which makes compounding error
+was chosen over reaching because it has a *staging* requirement: the gripper
+must get behind the block before pushing, which makes compounding error
 consequential. A policy that drifts during the approach ends up on the wrong
 side and shoves the block *away* from the goal, unrecoverably. That is the
 failure mode open-loop metrics are worst at surfacing.
@@ -37,7 +37,7 @@ failure mode open-loop metrics are worst at surfacing.
 **Expert.** A hand-coded orbit-then-push controller. Success rate: **100.0%**.
 
 **Policy.** 2×256 MLP, MSE behaviour cloning, 50 epochs, 400 episodes
-(~13k transitions). Identical across all runs — the model is not the point.
+(~13k transitions). Identical across all runs; the model is not the point.
 
 **Sweep axis: contamination rate ρ**, not per-episode severity. Every dataset
 has the same number of episodes; ρ of them are bad, (1−ρ) are clean.
@@ -47,17 +47,17 @@ has the same number of episodes; ρ of them are bad, (1−ρ) are clean.
 
 | Mode | Implementation |
 |---|---|
-| **Occlusion** | Contiguous 35% window of observations frozen at last visible frame. Actions stay expert-quality — the demonstrator can see, the camera can't. |
+| **Occlusion** | Contiguous 35% window of observations frozen at last visible frame. Actions stay expert-quality; the demonstrator can see, the camera can't. |
 | **Accidental success** | A controller that blindly charges the block, keeping only the ~6% of rollouts where the block happens to land on the goal. Right outcome, no correct behaviour anywhere. |
 | **Corrective flailing** | Heavy jitter on the first 12 timesteps, then the demonstrator settles and still succeeds. Re-simulated, so the wobble genuinely happened. |
-| **Truncation** | Episode cut at 70% and logged anyway — what a QC filter missing a premature stop looks like. |
-| **Inconsistent strategy** | A second scripted strategy (always circle the same rotational direction, wider staging radius). Also **100.0%** reliable — so mixing tests inconsistency, not quality. |
+| **Truncation** | Episode cut at 70% and logged anyway, what a QC filter missing a premature stop looks like. |
+| **Inconsistent strategy** | A second scripted strategy (always circle the same rotational direction, wider staging radius). Also **100.0%** reliable, so mixing tests inconsistency, not quality. |
 
 **Two design decisions that matter:**
 
 1. **Action-level corruptions are re-simulated, not pasted onto clean
    trajectories.** Overwriting actions in a logged episode without rerunning
-   the dynamics produces observations that no longer follow from the actions —
+   the dynamics produces observations that no longer follow from the actions,
    a physically impossible trajectory. That tests label noise, not bad
    demonstrations.
 2. **Corrupted episodes must pass the same success-based QC filter a real
@@ -85,7 +85,7 @@ Clean baseline: **0.972** closed-loop success.
 At full contamination, corrective flailing costs ~1 point of success while
 accidental success costs 96. These are both "bad demos" in any taxonomy.
 
-**Corrective flailing is essentially free** — arguably mildly beneficial, since
+**Corrective flailing is essentially free**, arguably mildly beneficial, since
 jitter-then-recover trajectories provide DAgger-like off-distribution state
 coverage. Filtering it out is wasted QC effort.
 
@@ -94,7 +94,7 @@ coverage. Filtering it out is wasted QC effort.
 0.965 at ρ=0.5. 0.950 at ρ=0.75. **0.012 at ρ=1.0.**
 
 This is the most operationally useful result here. Any meaningful fraction of
-genuinely correct demonstrations masks the problem completely — right up until
+genuinely correct demonstrations masks the problem completely, right up until
 it doesn't. A pipeline monitoring average success-labelled throughput sees
 nothing coming.
 
@@ -105,8 +105,8 @@ Pooled across all runs: **r = −0.91**. Convincing.
 Broken out by failure mode: **−0.15 to −0.94**. For truncation and flailing the
 offline metric carries essentially no signal about closed-loop behaviour.
 
-Among the 15 runs whose open-loop MSE lands in [0.20, 0.30] — indistinguishable
-on the offline metric — closed-loop success spans **0.315 to 0.980**.
+Among the 15 runs whose open-loop MSE lands in [0.20, 0.30] (indistinguishable
+on the offline metric), closed-loop success spans **0.315 to 0.980**.
 
 ![Open-loop vs closed-loop](results/fig2_openloop_vs_closedloop.png)
 
@@ -119,7 +119,7 @@ multimodal-averaging collapse. **The data does not support that**, and the
 control is worth stating plainly:
 
 At ρ=1.0 the dataset is 100% alternate-strategy and therefore fully
-self-consistent — there is no mixing left to blame. Success there (0.303) is
+self-consistent; there is no mixing left to blame. Success there (0.303) is
 the *clonability floor* of that strategy, not evidence of inconsistency harm.
 Both experts solve the task 100% of the time; the alternate is simply ~3×
 harder to clone (longer horizon, more orbit steps, more compounding error).
@@ -134,7 +134,7 @@ Reading intermediate ρ against the line joining the two endpoints:
 | 0.9 | 0.358 | 0.370 | −0.012 |
 
 Excess harm is positive everywhere. Mixing strategies was *not* worse than the
-clonability-weighted expectation — clean data protects rather than conflicts.
+clonability-weighted expectation; clean data protects rather than conflicts.
 The inconsistent-strategy curve looks damaging only because one strategy is
 intrinsically harder to imitate.
 
@@ -146,7 +146,7 @@ Real, but a much more modest result than the raw number suggests.
 
 ## Caveats worth stating before publishing
 
-- **3 seeds is thin.** Some cells are noisy — occlusion at ρ=1.0 spans 0.735
+- **3 seeds is thin.** Some cells are noisy: occlusion at ρ=1.0 spans 0.735
   to 0.955 across seeds. 10 seeds before any claim gets quoted with a number.
 - **2D toy environment.** Whether these rankings survive in a 7-DOF setting
   with contact dynamics and visual observations is open. This proves the
@@ -184,7 +184,7 @@ demo-quality-robustness/
     └── fig2_openloop_vs_closedloop.png
 ```
 
-The three modules are import-only — no side effects — so anyone can pull just
+The three modules are import-only, no side effects, so anyone can pull just
 `env2d.py` and `corruptions.py` to reuse the environment or the corruption
 functions independently of the rest.
 
