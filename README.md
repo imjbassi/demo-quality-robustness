@@ -7,7 +7,7 @@ evaluation tracks that damage.
 Fully code-based. No hardware, no robot time, no dataset licensing. The whole
 grid (78 training runs) takes about 13 minutes on a laptop CPU.
 
-**[Read the paper (PDF)](paper/paper.pdf)** for the full writeup with figures,
+**[Read the paper (PDF)](paper.pdf)** for the full writeup with figures,
 tables and references. This README covers the same ground more briefly.
 
 ---
