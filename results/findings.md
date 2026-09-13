@@ -8,11 +8,11 @@
 | Truncated episodes | -0.15 | +0.05 | 0.930 | 0.987 |
 | Inconsistent strategy | -0.90 | -0.92 | 0.933 | 0.303 |
 
-Pooled across all modes: Pearson r = -0.91, Spearman rho = -0.72
+Pooled across all modes: Pearson r = -0.91, Spearman rho = -0.73
 
 ### Matched open-loop score, unmatched reality
 
-Among the 15 runs whose open-loop MSE falls in [0.2, 0.3] — i.e. indistinguishable on the offline metric — closed-loop success ranges from **0.315 to 0.980** (spread of 0.665).
+Among the 15 runs whose open-loop MSE falls in [0.2, 0.3] — a descriptive similar-score band — closed-loop success ranges from **0.315 to 0.980** (spread of 0.665).
 
 - Inconsistent strategy, ρ=0.9: MSE 0.294 → success 0.315
 - Inconsistent strategy, ρ=0.9: MSE 0.299 → success 0.355
@@ -67,7 +67,7 @@ Among the 15 runs whose open-loop MSE falls in [0.2, 0.3] — i.e. indistinguish
 
 ## Clonability control for inconsistent strategy
 
-| ρ | observed success | interpolated (clonability-only) | excess harm from mixing |
+| ρ | observed success | interpolated (clonability-only) | residual vs. interpolation |
 |---|---|---|---|
 | 0.0 | 0.972 | 0.972 | +0.000 |
 | 0.25 | 0.972 | 0.805 | +0.167 |

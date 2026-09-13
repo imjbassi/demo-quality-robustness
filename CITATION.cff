@@ -9,9 +9,9 @@ abstract: >-
   with both open-loop action-prediction error and closed-loop task success.
 authors:
   - given-names: Jaiveer
-    family-names: "REPLACE_WITH_SURNAME"
+    family-names: Bassi
 version: "1.0.0"
-date-released: "2026-08-09"
+date-released: "2026-09-13"
 license: MIT
 keywords:
   - imitation learning

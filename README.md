@@ -114,8 +114,9 @@ Pooled across all runs: **r = −0.91**. Convincing.
 Broken out by failure mode: **−0.15 to −0.94**. For truncation and flailing the
 offline metric carries essentially no signal about closed-loop behaviour.
 
-Among the 15 runs whose open-loop MSE lands in [0.20, 0.30] (indistinguishable
-on the offline metric), closed-loop success spans **0.315 to 0.980**.
+Among the 15 runs whose open-loop MSE lands in the descriptive band
+[0.20, 0.30], closed-loop success spans **0.315 to 0.980**. This illustrates
+similar numerical scores; it is not a statistical equivalence test.
 
 ![Open-loop vs closed-loop](results/fig2_openloop_vs_closedloop.png)
 
@@ -135,16 +136,17 @@ harder to clone (longer horizon, more orbit steps, more compounding error).
 
 Reading intermediate ρ against the line joining the two endpoints:
 
-| ρ | observed | clonability-only interpolation | excess harm from mixing |
+| ρ | observed | clonability-only interpolation | residual vs. interpolation |
 |---|---|---|---|
 | 0.25 | 0.972 | 0.805 | **+0.167** |
 | 0.5 | 0.933 | 0.637 | **+0.296** |
 | 0.75 | 0.728 | 0.470 | **+0.258** |
 | 0.9 | 0.358 | 0.370 | −0.012 |
 
-Excess harm is positive everywhere. Mixing strategies was *not* worse than the
-clonability-weighted expectation; clean data protects rather than conflicts.
-The inconsistent-strategy curve looks damaging only because one strategy is
+The residual is non-negative at three of four intermediate points and slightly
+negative at ρ=0.9. Mixing strategies was therefore not consistently worse than
+the clonability-weighted expectation; at lower contamination rates, clean data
+may instead be protective. The inconsistent-strategy curve looks damaging mainly because one strategy is
 intrinsically harder to imitate.
 
 This matters for the headline claim: strip the inconsistent-strategy runs out
@@ -187,9 +189,8 @@ demo-quality-robustness/
 ├── analyze.py                stats and figures  →  results/findings.md, results/*.png
 ├── make_demo_gif.py          renders one expert episode →  results/demo.gif
 │
-├── paper/
-│   ├── paper.tex             LaTeX source (two-column, self-contained, no bibtex)
-│   └── paper.pdf             compiled 4-page paper
+├── paper.tex                 LaTeX source (two-column, self-contained, no bibtex)
+├── paper.pdf                 compiled paper
 │
 └── results/                  committed, so the repo is readable without running anything
     ├── results.csv           raw per-run results (93 rows: mode, ρ, seed, both metrics)
@@ -224,11 +225,11 @@ runs are deterministic given the same PyTorch version. Results here were
 produced with torch 2.13 / numpy 2.4 on CPU; minor numeric drift across torch
 versions is expected and should not move any conclusion.
 
-To rebuild the paper (requires a LaTeX distribution; figures are pulled from
-`results/` by relative path, so compile from inside `paper/`):
+To rebuild the paper (requires a LaTeX distribution; compile from the
+repository root):
 
 ```bash
-cd paper && pdflatex paper.tex && pdflatex paper.tex
+pdflatex paper.tex && pdflatex paper.tex
 ```
 
 To change the sweep, edit the constants at the top of `run_experiment.py`

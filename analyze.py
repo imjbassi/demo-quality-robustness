@@ -15,7 +15,8 @@ LABEL = {"occlusion": "Occlusion (stale obs)",
          "flailing": "Corrective flailing",
          "truncation": "Truncated episodes",
          "inconsistent_strategy": "Inconsistent strategy"}
-COLOR = dict(zip(ORDER, ["#c0392b", "#8e44ad", "#16a085", "#d68910", "#2471a3"]))
+COLOR = dict(zip(ORDER, ["#D55E00", "#CC79A7", "#009E73", "#E69F00", "#0072B2"]))
+MARKER = dict(zip(ORDER, ["o", "s", "^", "D", "P"]))
 
 
 RESULTS = "results/results.csv"
@@ -68,36 +69,41 @@ def main():
     for c in ORDER:
         m = [A[(c, r)]["closed_loop_success"][0] for r in rhos]
         s = [A[(c, r)]["closed_loop_success"][1] for r in rhos]
-        ax[0].errorbar(rhos, m, yerr=s, marker="o", capsize=3, lw=2,
+        ax[0].errorbar(rhos, m, yerr=s, marker=MARKER[c], capsize=3, lw=2,
                        color=COLOR[c], label=LABEL[c])
         m = [A[(c, r)]["open_loop_mse"][0] for r in rhos]
         s = [A[(c, r)]["open_loop_mse"][1] for r in rhos]
-        ax[1].errorbar(rhos, m, yerr=s, marker="o", capsize=3, lw=2,
+        ax[1].errorbar(rhos, m, yerr=s, marker=MARKER[c], capsize=3, lw=2,
                        color=COLOR[c], label=LABEL[c])
-    ax[0].set_xlabel("contamination rate ρ (fraction of dataset)")
-    ax[0].set_ylabel("closed-loop success rate")
-    ax[0].set_title("Closed-loop: what actually happens")
+    ax[0].set_xlabel("Contamination rate, ρ")
+    ax[0].set_ylabel("Closed-loop success rate")
+    ax[0].set_title("Closed-loop task performance")
     ax[0].set_ylim(-0.03, 1.05)
-    ax[1].set_xlabel("contamination rate ρ (fraction of dataset)")
-    ax[1].set_ylabel("open-loop action MSE (vs expert, held-out clean states)")
-    ax[1].set_title("Open-loop: what the cheap metric reports")
+    ax[1].set_xlabel("Contamination rate, ρ")
+    ax[1].set_ylabel("Open-loop action MSE")
+    ax[1].set_title("Open-loop prediction error")
     for a in ax:
         a.grid(alpha=0.25)
     ax[0].legend(fontsize=8.5, loc="lower left")
-    fig.suptitle("Not all bad demonstrations are equally bad", fontsize=13)
     fig.tight_layout()
     fig.savefig("results/fig1_dose_response.png", dpi=160)
 
     # ---- Figure 2: does open-loop MSE predict closed-loop success? --------
     fig, ax = plt.subplots(figsize=(7.2, 5.4))
     for c in ORDER:
-        x = [r["open_loop_mse"] for r in rows if r["corruption"] == c]
-        y = [r["closed_loop_success"] for r in rows if r["corruption"] == c]
-        ax.scatter(x, y, s=42, color=COLOR[c], alpha=0.85, label=LABEL[c],
-                   edgecolor="white", lw=0.7)
-    ax.set_xlabel("open-loop action MSE  (cheap, offline)")
-    ax.set_ylabel("closed-loop success rate  (expensive, on-robot)")
-    ax.set_title("Same open-loop score, wildly different real performance")
+        x = [r["open_loop_mse"] for r in rows
+             if r["corruption"] == c and r["rho"] > 0]
+        y = [r["closed_loop_success"] for r in rows
+             if r["corruption"] == c and r["rho"] > 0]
+        ax.scatter(x, y, s=42, marker=MARKER[c], color=COLOR[c], alpha=0.85,
+                   label=LABEL[c], edgecolor="white", lw=0.7)
+    clean = [r for r in rows if r["corruption"] == ORDER[0] and r["rho"] == 0]
+    ax.scatter([r["open_loop_mse"] for r in clean],
+               [r["closed_loop_success"] for r in clean], s=48, marker="X",
+               color="#555555", label="Clean baseline", edgecolor="white", lw=0.7)
+    ax.set_xlabel("Open-loop action MSE")
+    ax.set_ylabel("Closed-loop success rate")
+    ax.set_title("Open-loop error does not uniquely determine task success")
     ax.grid(alpha=0.25)
     ax.legend(fontsize=8.5)
     fig.tight_layout()
@@ -114,19 +120,22 @@ def main():
         lines.append(f"| {LABEL[c]} | {pearson(x, y):+.2f} | {spearman(x, y):+.2f} | "
                      f"{A[(c, 0.5)]['closed_loop_success'][0]:.3f} | "
                      f"{A[(c, 1.0)]['closed_loop_success'][0]:.3f} |")
-    allx = [r["open_loop_mse"] for r in rows]
-    ally = [r["closed_loop_success"] for r in rows]
+    unique_rows = ([r for r in rows if r["rho"] > 0] +
+                   [r for r in rows
+                    if r["corruption"] == ORDER[0] and r["rho"] == 0])
+    allx = [r["open_loop_mse"] for r in unique_rows]
+    ally = [r["closed_loop_success"] for r in unique_rows]
     lines.append(f"\nPooled across all modes: Pearson r = {pearson(allx, ally):+.2f}, "
                  f"Spearman rho = {spearman(allx, ally):+.2f}\n")
 
-    # matched-MSE band: the money statistic
+    # Descriptive similar-MSE band.
     lo, hi = 0.20, 0.30
-    band = [r for r in rows if lo <= r["open_loop_mse"] <= hi]
+    band = [r for r in unique_rows if lo <= r["open_loop_mse"] <= hi]
     if len(band) >= 2:
         ys = [r["closed_loop_success"] for r in band]
         lines.append(f"### Matched open-loop score, unmatched reality\n")
         lines.append(f"Among the {len(band)} runs whose open-loop MSE falls in "
-                     f"[{lo}, {hi}] — i.e. indistinguishable on the offline metric — "
+                     f"[{lo}, {hi}] — a descriptive similar-score band — "
                      f"closed-loop success ranges from **{min(ys):.3f} to {max(ys):.3f}** "
                      f"(spread of {max(ys)-min(ys):.3f}).\n")
         for r in sorted(band, key=lambda r: r["closed_loop_success"]):
@@ -144,7 +153,7 @@ def main():
                          f"| {a['wrong_side_rate'][0]:.3f} |")
 
     lines.append(clonability_control())
-    open("results/findings.md", "w").write("\n".join(lines) + "\n")
+    open("results/findings.md", "w", encoding="utf-8").write("\n".join(lines) + "\n")
     print("\n".join(lines[:24]))
     print("\nwrote results/findings.md and both figures")
 
@@ -166,7 +175,7 @@ def clonability_control(path=RESULTS):
     A = agg(rows)
     rhos = sorted({r["rho"] for r in rows})
     out = ["\n## Clonability control for inconsistent strategy\n",
-           "| ρ | observed success | interpolated (clonability-only) | excess harm from mixing |",
+           "| ρ | observed success | interpolated (clonability-only) | residual vs. interpolation |",
            "|---|---|---|---|"]
     lo = A[("inconsistent_strategy", 0.0)]["closed_loop_success"][0]
     hi = A[("inconsistent_strategy", 1.0)]["closed_loop_success"][0]
