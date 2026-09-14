@@ -151,8 +151,31 @@ The alternate oracle is a deterministic function of the current 10-D observation
 
 - train_mse_alt: 0.0519 ± 0.0044 (95% t interval; SD 0.0062)
 - heldout_mse_alt: 0.0568 ± 0.0041 (95% t interval; SD 0.0057)
+- on_policy_mse_alt: 0.0810 ± 0.0260 (95% t interval; SD 0.0363)
+- on_policy_mse_steps_0_19: 0.0683 ± 0.0102 (95% t interval; SD 0.0142)
+- on_policy_mse_steps_90_109: 0.0859 ± 0.0283 (95% t interval; SD 0.0396)
 - clone_success: 0.2295 ± 0.1021 (95% t interval; SD 0.1427)
 - oracle_success: 1.0000 ± 0.0000 (95% t interval; SD 0.0000)
+
+## Transition-matched full-truncation control
+
+| policy | matched success | paired change from original | episodes | max transition gap |
+|---|---|---|---|---|
+| mlp | 0.975 ± 0.010 | +0.013 ± 0.019 | 572-599 | 7 |
+| trees | 0.644 ± 0.052 | +0.030 ± 0.053 | 572-599 | 7 |
+
+## Alternate-clone error by state distribution and phase
+
+| distribution | controller phase | state-weighted MSE | states |
+|---|---|---|---|
+| heldout_expert | approach_outer | 0.0445 | 21000 |
+| heldout_expert | orbit | 0.0563 | 83440 |
+| heldout_expert | approach_stage | 0.0790 | 10720 |
+| heldout_expert | push | 0.0595 | 24710 |
+| on_policy | approach_outer | 0.0429 | 15014 |
+| on_policy | orbit | 0.0873 | 155571 |
+| on_policy | approach_stage | 0.0678 | 11613 |
+| on_policy | push | 0.0472 | 15308 |
 
 ## Clonability control for inconsistent strategy
 

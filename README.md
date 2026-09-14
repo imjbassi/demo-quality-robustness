@@ -5,8 +5,9 @@ modes degrade closed-loop policy performance, and how badly open-loop
 evaluation tracks that damage.
 
 Fully code-based. No hardware, robot time, or dataset licensing. The release
-contains 640 policy fits: two 260-fit main sweeps and 120 transition-matched
-controls, all across ten paired training/evaluation seeds.
+contains 660 policy fits: two 260-fit main sweeps, 120 transition-matched
+strategy controls, and 20 transition-matched truncation controls, all across
+ten paired training/evaluation seeds.
 
 **[Read the paper (PDF)](paper.pdf)** for the full writeup with figures,
 tables and references. This README covers the same ground more briefly.
@@ -154,6 +155,14 @@ Accidental success remains catastrophic and corrective flailing remains
 benign. Occlusion and truncation exchange rank across policies, so
 quality-control priorities must account for the intended learner.
 
+The truncation datasets initially contained fewer transitions because the
+episodes were cut to 70% of their original length. A 20-fit control raises
+them to 572–599 episodes, matching each paired clean dataset within seven
+transitions. MLP success is 0.976 ± 0.010 and Extra Trees success is
+0.644 ± 0.052; the paired changes from the original truncation runs are only
++0.013 ± 0.019 and +0.030 ± 0.053. The Extra Trees result therefore does not
+recover toward its 0.990 occlusion score when sample count is matched.
+
 ### Transition matching rejects the strategy-conflict explanation
 
 At ρ=1.0 the alternate-strategy dataset is fully self-consistent; its low
@@ -171,11 +180,18 @@ The alternate expert is **not non-Markovian**: its action is an explicit,
 deterministic function of the current 10-D observation, and that state-only
 oracle succeeds on all 2,000 diagnostic rollouts. Its MLP clone nevertheless
 has low held-out error on alternate trajectories (0.0568 ± 0.0041, 95%
-t-interval half-width) and only 0.229 ± 0.102 rollout success. The observation
-is sufficient for the expert; one-step regression is not sufficient for a
-robust closed-loop clone. This is consistent with compounding error or
-sensitivity near controller switching boundaries, but the current diagnostic
-does not distinguish those mechanisms.
+t-interval half-width) and only 0.229 ± 0.102 rollout success. For context, the
+primary clone's own-distribution held-out MSE is 0.1218 ± 0.0015 and its
+success is 0.949 ± 0.015, although the two MSEs use different expert state
+distributions and action targets and are not directly comparable.
+
+On clone-visited states, alternate-oracle MSE rises to 0.0810 ± 0.0260—43%
+above the held-out mean—and later-step error exceeds early-step error. The
+largest excess is spread across the orbit phase rather than concentrated at
+the stage or push switches. Seed intervals remain wide, so this favors but
+does not prove covariate shift and compounding error over a narrow switching
+boundary. The observation is sufficient for the expert; one-step regression
+is not sufficient for a robust closed-loop clone.
 
 ---
 
@@ -209,6 +225,7 @@ demo-quality-robustness/
 ├── policy.py                 MLP + Extra Trees policies and evaluations
 ├── run_experiment.py         main grid runner
 ├── run_controls.py           transition-matched strategy controls
+├── run_truncation_control.py full-truncation sample-count control
 ├── run_diagnostics.py        label-fidelity + alternate-clonability checks
 ├── analyze.py                stats and figures  →  results/findings.md, results/*.png
 ├── make_demo_gif.py          renders one expert episode →  results/demo.gif
@@ -220,8 +237,11 @@ demo-quality-robustness/
     ├── results.csv           MLP results (310 rows; 260 independent fits)
     ├── results_tree.csv      Extra Trees results (same design)
     ├── control_results.csv   120 transition-matched control fits
+    ├── truncation_transition_control.csv  20 sample-matched truncation fits
     ├── label_fidelity.csv    per-mode expert-label disagreement
     ├── alternate_clonability.csv  state-only oracle and clone diagnostics
+    ├── on_policy_error_by_step.csv  clone-oracle error over rollout time
+    ├── on_policy_error_by_phase.csv clone-oracle error by controller phase
     ├── findings.md           generated statistics tables
     ├── fig1_dose_response.png
     ├── fig2_openloop_vs_closedloop.png
@@ -246,6 +266,7 @@ pip install -r requirements.txt
 python run_experiment.py --policy mlp --out results/results.csv
 python run_experiment.py --policy trees --out results/results_tree.csv
 python run_controls.py
+python run_truncation_control.py
 python run_diagnostics.py
 python analyze.py          # findings.md and all three figures
 ```

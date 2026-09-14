@@ -29,6 +29,8 @@ TREE_RESULTS = "results/results_tree.csv"
 CONTROL_RESULTS = "results/control_results.csv"
 LABEL_FIDELITY_RESULTS = "results/label_fidelity.csv"
 ALT_CLONABILITY_RESULTS = "results/alternate_clonability.csv"
+TRUNCATION_CONTROL_RESULTS = "results/truncation_transition_control.csv"
+ON_POLICY_PHASE_RESULTS = "results/on_policy_error_by_phase.csv"
 T95_10 = 2.262157  # two-sided 95% Student-t critical value, df=9
 
 
@@ -61,8 +63,10 @@ def load_numeric_csv(path):
         rows = list(csv.DictReader(stream))
     for row in rows:
         for key, value in row.items():
-            if key not in ("corruption", "policy"):
+            try:
                 row[key] = float(value)
+            except ValueError:
+                pass
     return rows
 
 
@@ -323,11 +327,55 @@ def main():
         lines.append("The alternate oracle is a deterministic function of the "
                      "current 10-D observation, so the strategy is Markovian "
                      "in the recorded state.\n")
-        for metric in ("train_mse_alt", "heldout_mse_alt", "clone_success",
+        for metric in ("train_mse_alt", "heldout_mse_alt", "on_policy_mse_alt",
+                       "on_policy_mse_steps_0_19",
+                       "on_policy_mse_steps_90_109", "clone_success",
                        "oracle_success"):
             mean, sd, ci = summarize([row[metric] for row in alt_rows])
             lines.append(f"- {metric}: {mean:.4f} ± {ci:.4f} (95% t interval; "
                          f"SD {sd:.4f})")
+
+    if os.path.exists(TRUNCATION_CONTROL_RESULTS):
+        matched = load_numeric_csv(TRUNCATION_CONTROL_RESULTS)
+        lines.append("\n## Transition-matched full-truncation control\n")
+        lines.append("| policy | matched success | paired change from original | episodes | max transition gap |")
+        lines.append("|---|---|---|---|---|")
+        original_by_policy = {"mlp": load(RESULTS), "trees": load(TREE_RESULTS)}
+        for policy in ("mlp", "trees"):
+            group = [row for row in matched if row["policy"] == policy]
+            success = [row["closed_loop_success"] for row in group]
+            original = {
+                row["seed"]: row["closed_loop_success"]
+                for row in original_by_policy[policy]
+                if row["corruption"] == "truncation" and row["rho"] == 1.0
+            }
+            changes = [row["closed_loop_success"] - original[int(row["seed"])]
+                       for row in group]
+            mean, _, ci = summarize(success)
+            delta, _, delta_ci = summarize(changes)
+            episodes = [int(row["n_episodes"]) for row in group]
+            max_gap = max(abs(int(row["transition_gap"])) for row in group)
+            lines.append(
+                f"| {policy} | {mean:.3f} ± {ci:.3f} | "
+                f"{delta:+.3f} ± {delta_ci:.3f} | "
+                f"{min(episodes)}-{max(episodes)} | {max_gap} |"
+            )
+
+    if os.path.exists(ON_POLICY_PHASE_RESULTS):
+        phase_rows = load_numeric_csv(ON_POLICY_PHASE_RESULTS)
+        lines.append("\n## Alternate-clone error by state distribution and phase\n")
+        lines.append("| distribution | controller phase | state-weighted MSE | states |")
+        lines.append("|---|---|---|---|")
+        for distribution in ("heldout_expert", "on_policy"):
+            for phase in ("approach_outer", "orbit", "approach_stage", "push"):
+                group = [row for row in phase_rows
+                         if row["distribution"] == distribution
+                         and row["phase"] == phase]
+                states = sum(row["n_states"] for row in group)
+                mse = sum(row["mse"] * row["n_states"] for row in group) / states
+                lines.append(
+                    f"| {distribution} | {phase} | {mse:.4f} | {int(states)} |"
+                )
 
     lines.append(clonability_control())
     open("results/findings.md", "w", encoding="utf-8").write("\n".join(lines) + "\n")

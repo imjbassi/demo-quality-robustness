@@ -39,16 +39,18 @@ Closed-Loop Policy Performance}
 \begin{abstract}
 \noindent
 We isolate five demonstration defects in a controlled 2D block-pushing task
-while holding task, dataset size, and training protocol fixed. Across 640
-policy fits, ten paired seeds, two policy families, and a transition-matched
-control, defect cost is not determined by retained primary-expert action
+while holding task, dataset size, and training protocol fixed. Across 660
+policy fits, ten paired seeds, two policy families, and transition-matched
+controls, defect cost is not determined by retained primary-expert action
 information. At full contamination, accidental-success and occlusion data
 have nearly equal label-fidelity MSE ($0.207$ and $0.212$), yet MLP rollout
 success is $0.009$ and $0.866$; inconsistent-strategy data has worse label
 fidelity ($0.475$) but higher success ($0.229$). Thus the robust result is not
 merely that low-fidelity labels are harmful: accidental success exhibits a
-late cliff, while the middle ranking changes with policy class. Offline
-evaluation is similarly non-identifying: 49 policies with open-loop MSE in
+late cliff, while the middle ranking changes with policy class. Matching
+truncated datasets to clean transition counts leaves Extra Trees success at
+$0.644$, versus $0.990$ under occlusion. Offline evaluation is similarly
+non-identifying: 49 policies with open-loop MSE in
 $[0.20,0.30]$ span success from $0.130$ to $0.995$. The alternate controller
 is exactly Markovian in the recorded 10-D state and its state-only oracle
 succeeds on every rollout; nevertheless, its MLP clone attains low held-out
@@ -72,6 +74,7 @@ defects differ in whether states, actions, temporal coverage, or strategy are
 altered. A finite quality-control budget therefore raises a narrower question
 than whether ``better data helps'': after accounting for retained expert
 action information, do defect type and learner still change the outcome?
+A second question is whether a cheap offline metric detects the damage.
 
 \subsection{Related work and scope}
 
@@ -206,7 +209,10 @@ removes this variation.
 Because alternate-strategy episodes are longer, we add a control that fixes
 the dataset at 13,000 transitions and defines $\rho$ as the exact fraction of
 transitions drawn from that strategy. Repeating all six mixture levels for
-both policy families and ten seeds adds 120 fits, for 640 fits in total.
+both policy families and ten seeds adds 120 fits. A separate full-truncation
+control raises the episode count until each dataset matches its paired clean
+transition count to within seven transitions, then refits both policies across
+ten seeds. Those 20 additional fits bring the total to 660.
 
 Two metrics are recorded per policy. \textbf{Open-loop MSE} is
 action-prediction error against 300 held-out \emph{clean} expert episodes.
@@ -289,7 +295,7 @@ Occlusion (stale obs)  & 0.212 & 0.905 & 0.866 \\
 Inconsistent strategy  & 0.475 & 0.934 & 0.229 \\
 Accidental success     & 0.207 & 0.939 & \textbf{0.009} \\
 \midrule
-\textit{Clean baseline} & 0.000 & \multicolumn{2}{c}{\textit{0.949}} \\
+\textit{Clean baseline} & 0.000 & \multicolumn{2}{c}{\textit{0.949 (shared $\rho=0$)}} \\
 \bottomrule
 \end{tabular}
 \caption{Primary-expert label-fidelity MSE at full contamination and MLP
@@ -392,6 +398,16 @@ half-width over ten paired seeds).}
 \label{tab:policies}
 \end{table}
 
+The truncation comparison initially used fewer transitions because every
+episode was cut to 70\% of its length. To isolate missing terminal coverage
+from sample count, we increased the full-truncation datasets to 572--599 whole
+episodes, matching each paired clean dataset to within seven transitions, and
+refit both policy families. Matched MLP success is $0.976\pm0.010$ and matched
+Extra Trees success is $0.644\pm0.052$. Relative to the original truncation
+runs, paired changes are $+0.013\pm0.019$ and $+0.030\pm0.053$, respectively.
+Thus matching sample count does not materially recover the tree policy, which
+remains far below its $0.990$ occlusion result; the rank swap persists.
+
 \subsection{Strategy mixing and observation adequacy}
 
 We initially predicted that mixing two valid strategies would cause
@@ -426,11 +442,20 @@ current 10-D observation. The state-only oracle succeeds on all 2,000
 evaluation rollouts across the ten seeds. An MLP trained only on alternate
 demonstrations also achieves held-out alternate-trajectory MSE
 $0.0568\pm0.0041$, yet closed-loop success remains $0.229\pm0.102$ (95\%
-t-interval half-widths). Observation is therefore sufficient for the scripted
-expert, while one-step regression is not sufficient for a robust clone. This
-pattern is consistent with compounding error or sensitivity near the
-controller's switching geometry, but the present diagnostic does not identify
-which mechanism dominates.
+t-interval half-widths). For scale, the successful primary clone has
+$0.1218\pm0.0015$ open-loop MSE and $0.949\pm0.015$ success; the MSE values are
+not strictly comparable because each is evaluated on its own expert's held-out
+state distribution and action targets.
+
+Clone-oracle MSE on states visited by the clone rises to $0.0810\pm0.0260$, a
+43\% mean increase over held-out alternate-expert states. It is $0.0683$ over
+steps 0--19 and $0.0859$ over steps 90--109. The largest state-weighted excess
+is distributed through the orbit phase ($0.087$ on-policy versus $0.056$ on
+expert states), rather than spiking at the stage or push switches. The paired
+error increases have wide intervals that include zero, so this pattern favors,
+but does not prove, covariate shift and compounding error over a narrow
+switching-boundary failure. Observation is sufficient for the scripted expert;
+one-step regression is not sufficient for a robust clone.
 
 \section{Limitations}
 
@@ -462,7 +487,8 @@ stable and policy-dependent effects that cannot be reduced to action-label
 fidelity. Accidental-success and occlusion demonstrations disagree similarly
 with the primary expert but produce radically different MLP policies;
 occlusion and truncation also exchange rank across the MLP and Extra Trees.
-The defensible result is therefore narrower than a universal hierarchy:
+The sample-matched truncation control preserves that swap. The defensible
+result is therefore narrower than a universal hierarchy:
 accidental success has a late cliff, while QC priority in the middle depends
 on defect structure and the intended learner.
 
@@ -479,7 +505,7 @@ does not substitute for closed-loop validation.
 Source code, exact training and evaluation seeds, raw per-run results, and the
 scripts used to generate all three figures are available at
 \url{https://github.com/imjbassi/demo-quality-robustness}. The repository also
-records the software requirements and commands needed to reproduce all 640
+records the software requirements and commands needed to reproduce all 660
 policy fits and rebuild this manuscript.
 
 \begin{thebibliography}{99}
