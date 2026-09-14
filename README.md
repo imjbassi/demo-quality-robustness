@@ -4,8 +4,9 @@ A controlled simulation study of how specific demonstration-quality failure
 modes degrade closed-loop policy performance, and how badly open-loop
 evaluation tracks that damage.
 
-Fully code-based. No hardware, no robot time, no dataset licensing. The whole
-grid (78 training runs) takes about 13 minutes on a laptop CPU.
+Fully code-based. No hardware, robot time, or dataset licensing. The release
+contains 640 policy fits: two 260-fit main sweeps and 120 transition-matched
+controls, all across ten paired training/evaluation seeds.
 
 **[Read the paper (PDF)](paper.pdf)** for the full writeup with figures,
 tables and references. This README covers the same ground more briefly.
@@ -22,8 +23,8 @@ tables and references. This README covers the same ground more briefly.
 
 Robot-learning work overwhelmingly treats *architecture* as the independent
 variable. This treats **demonstration quality** as the independent variable
-and holds everything else fixed: same environment, same policy architecture,
-same hyperparameters, same dataset size, same evaluation initial conditions.
+and holds the task, training protocol, dataset size, and paired evaluation
+conditions fixed. The full sweep is repeated for two policy families.
 
 Two things get measured for every policy:
 
@@ -45,12 +46,13 @@ failure mode open-loop metrics are worst at surfacing.
 
 **Expert.** A hand-coded orbit-then-push controller. Success rate: **100.0%**.
 
-**Policy.** 2×256 MLP, MSE behaviour cloning, 50 epochs, 400 episodes
-(~13k transitions). Identical across all runs; the model is not the point.
+**Policies.** A 2×256 MLP trained by MSE behaviour cloning for 50 epochs and
+an Extra Trees regressor with 40 trees. Both use the same 400-episode datasets.
 
 **Sweep axis: contamination rate ρ**, not per-episode severity. Every dataset
 has the same number of episodes; ρ of them are bad, (1−ρ) are clean.
-ρ ∈ {0, 0.25, 0.5, 0.75, 0.9, 1.0}, 3 seeds each.
+ρ ∈ {0, 0.25, 0.5, 0.75, 0.9, 1.0}, with ten seeds each. A separate strategy
+control fixes 13,000 total transitions and defines ρ at transition level.
 
 ### The five failure modes
 
@@ -79,28 +81,30 @@ has the same number of episodes; ρ of them are bad, (1−ρ) are clean.
 
 ![Dose-response curves](results/fig1_dose_response.png)
 
-Clean baseline: **0.972** closed-loop success.
+MLP clean baseline: **0.949 ± 0.015** closed-loop success (mean ± 95% t-interval
+half-width). Extra Trees clean baseline: **0.996 ± 0.003**.
 
 | Mode | ρ=0.5 | ρ=1.0 | Pearson r (MSE ↔ success) |
 |---|---|---|---|
-| Truncated episodes | 0.930 | 0.987 | −0.15 |
-| Corrective flailing | 0.972 | 0.963 | −0.35 |
-| Occlusion | 0.910 | 0.867 | −0.58 |
-| Inconsistent strategy | 0.933 | 0.303 | −0.90 |
-| Accidental success | 0.965 | **0.012** | −0.94 |
+| Truncated episodes | 0.940 | 0.962 | −0.13 |
+| Corrective flailing | 0.963 | 0.965 | −0.26 |
+| Occlusion | 0.905 | 0.866 | −0.64 |
+| Inconsistent strategy | 0.934 | 0.229 | −0.89 |
+| Accidental success | 0.939 | **0.009** | −0.95 |
 
 ### 1. Failure modes are not interchangeable, and the ranking is not intuitive
 
-At full contamination, corrective flailing costs ~1 point of success while
-accidental success costs 96. These are both "bad demos" in any taxonomy.
+At full contamination, the MLP's paired change from clean is **+0.016 ±
+0.022** for corrective flailing and **−0.940 ± 0.020** for accidental success.
+These are both "bad demos" in a practical taxonomy.
 
-**Corrective flailing is essentially free**, arguably mildly beneficial, since
-jitter-then-recover trajectories provide DAgger-like off-distribution state
-coverage. Filtering it out is wasted QC effort.
+**Corrective flailing causes no detectable loss here.** Jitter-then-recover
+trajectories may provide DAgger-like off-distribution state coverage, but the
+paired interval includes zero change and does not establish a benefit.
 
 ### 2. Accidental success is a cliff, not a slope
 
-0.965 at ρ=0.5. 0.950 at ρ=0.75. **0.012 at ρ=1.0.**
+0.939 at ρ=0.5. 0.917 at ρ=0.75. **0.009 at ρ=1.0.**
 
 This is the most operationally useful result here. Any meaningful fraction of
 genuinely correct demonstrations masks the problem completely, right up until
@@ -109,66 +113,62 @@ nothing coming.
 
 ### 3. Open-loop MSE looks predictive in aggregate and isn't, per mode
 
-Pooled across all runs: **r = −0.91**. Convincing.
+Pooled across all 260 MLP fits: **r = −0.92**.
 
-Broken out by failure mode: **−0.15 to −0.94**. For truncation and flailing the
+Broken out by failure mode: **−0.13 to −0.95**. For truncation and flailing the
 offline metric carries essentially no signal about closed-loop behaviour.
 
-Among the 15 runs whose open-loop MSE lands in the descriptive band
-[0.20, 0.30], closed-loop success spans **0.315 to 0.980**. This illustrates
+Among the 49 runs whose open-loop MSE lands in the descriptive band
+[0.20, 0.30], closed-loop success spans **0.130 to 0.995**. This illustrates
 similar numerical scores; it is not a statistical equivalence test.
 
 ![Open-loop vs closed-loop](results/fig2_openloop_vs_closedloop.png)
 
 ---
 
-## Where the prediction failed
+## Robustness controls
 
-The design predicted that mixing two valid strategies would cause
-multimodal-averaging collapse. **The data does not support that**, and the
-control is worth stating plainly:
+### Policy family changes the middle of the ranking
 
-At ρ=1.0 the dataset is 100% alternate-strategy and therefore fully
-self-consistent; there is no mixing left to blame. Success there (0.303) is
-the *clonability floor* of that strategy, not evidence of inconsistency harm.
-Both experts solve the task 100% of the time; the alternate is simply ~3×
-harder to clone (longer horizon, more orbit steps, more compounding error).
+| Mode at ρ=1.0 | MLP success | Extra Trees success |
+|---|---:|---:|
+| Corrective flailing | 0.965 ± 0.015 | 0.993 ± 0.007 |
+| Truncated episodes | 0.962 ± 0.017 | 0.614 ± 0.033 |
+| Occlusion | 0.866 ± 0.038 | 0.990 ± 0.006 |
+| Inconsistent strategy | 0.229 ± 0.102 | 0.142 ± 0.050 |
+| Accidental success | **0.009 ± 0.008** | **0.002 ± 0.003** |
 
-Reading intermediate ρ against the line joining the two endpoints:
+Accidental success remains catastrophic and corrective flailing remains
+benign. Occlusion and truncation exchange rank across policies, so quality-
+control priorities must account for the intended learner.
 
-| ρ | observed | clonability-only interpolation | residual vs. interpolation |
-|---|---|---|---|
-| 0.25 | 0.972 | 0.805 | **+0.167** |
-| 0.5 | 0.933 | 0.637 | **+0.296** |
-| 0.75 | 0.728 | 0.470 | **+0.258** |
-| 0.9 | 0.358 | 0.370 | −0.012 |
+### Transition matching rejects the strategy-conflict explanation
 
-The residual is non-negative at three of four intermediate points and slightly
-negative at ρ=0.9. Mixing strategies was therefore not consistently worse than
-the clonability-weighted expectation; at lower contamination rates, clean data
-may instead be protective. The inconsistent-strategy curve looks damaging mainly because one strategy is
-intrinsically harder to imitate.
+At ρ=1.0 the alternate-strategy dataset is fully self-consistent; its low
+success is a clonability floor, not evidence of mixing harm. The additional
+control fixes every dataset at 13,000 transitions and makes ρ the exact
+alternate-strategy transition fraction. For both policies, every intermediate
+mixture performs above the line connecting its two endpoints.
 
-This matters for the headline claim: strip the inconsistent-strategy runs out
-of the matched-MSE band and the spread narrows from 0.665 to about 0.22.
-Real, but a much more modest result than the raw number suggests.
+![Strategy controls](results/fig3_strategy_controls.png)
+
+The apparent inconsistent-strategy penalty is therefore dominated by the
+alternate strategy's lower clonability, not by conflict between strategies.
 
 ---
 
-## Caveats worth stating before publishing
+## Limitations
 
-- **3 seeds is thin.** Some cells are noisy: occlusion at ρ=1.0 spans 0.735
-  to 0.955 across seeds. 10 seeds before any claim gets quoted with a number.
-- **2D toy environment.** Whether these rankings survive in a 7-DOF setting
-  with contact dynamics and visual observations is open. This proves the
-  methodology, not the numbers.
-- **Alternate-strategy episodes are longer**, so at fixed episode count they
-  contribute more transitions. A transition-matched replication would tighten
-  the inconsistent-strategy arm further.
-- **One policy class.** MSE regression averages multimodal action
-  distributions by construction; a diffusion or flow-matching policy might
-  handle the inconsistent-strategy case very differently. That is the single
-  most interesting follow-up.
+- **Controlled 2D simulation.** The study isolates mechanisms; it does not
+  establish transferable numerical thresholds for 7-DOF or vision-based work.
+- **Two deterministic regressors.** MLP and Extra Trees cover different
+  inductive biases, but generative policies may behave differently.
+- **Finite evaluation coverage.** Ten paired seeds and 200 evaluation episodes
+  per fit improve precision without exhausting the simulator distribution.
+- **Exploratory analysis.** The MSE band was not preregistered, and intervals
+  are not adjusted for multiple comparisons.
+- **Scripted defects.** Exact programmatic control does not capture every
+  temporal dependency present in human demonstrations.
 
 ---
 
@@ -184,8 +184,9 @@ demo-quality-robustness/
 │
 ├── env2d.py                  vectorized Push2D environment + the three scripted controllers
 ├── corruptions.py            the five corruption modes and dataset assembly
-├── policy.py                 BC policy, training loop, both evaluations
-├── run_experiment.py         grid runner        →  results/results.csv
+├── policy.py                 MLP + Extra Trees policies and evaluations
+├── run_experiment.py         main grid runner
+├── run_controls.py           transition-matched strategy controls
 ├── analyze.py                stats and figures  →  results/findings.md, results/*.png
 ├── make_demo_gif.py          renders one expert episode →  results/demo.gif
 │
@@ -193,10 +194,13 @@ demo-quality-robustness/
 ├── paper.pdf                 compiled paper
 │
 └── results/                  committed, so the repo is readable without running anything
-    ├── results.csv           raw per-run results (93 rows: mode, ρ, seed, both metrics)
+    ├── results.csv           MLP results (310 rows; 260 independent fits)
+    ├── results_tree.csv      Extra Trees results (same design)
+    ├── control_results.csv   120 transition-matched control fits
     ├── findings.md           generated statistics tables
     ├── fig1_dose_response.png
     ├── fig2_openloop_vs_closedloop.png
+    ├── fig3_strategy_controls.png
     └── demo.gif
 ```
 
@@ -205,8 +209,7 @@ The three modules are import-only, no side effects, so anyone can pull just
 functions independently of the rest.
 
 **Commit `results/`.** It is a few hundred KB and it means the repo makes its
-point to someone reading it in a browser, without a clone, an install, or 13
-minutes of CPU.
+point to someone reading it in a browser without a clone or an install.
 
 ## Reproducing
 
@@ -215,15 +218,16 @@ git clone https://github.com/<user>/demo-quality-robustness
 cd demo-quality-robustness
 pip install -r requirements.txt
 
-python run_experiment.py   # ~13 min on a laptop CPU, writes results/results.csv
-python analyze.py          # writes results/findings.md and both figures
+python run_experiment.py --policy mlp --out results/results.csv
+python run_experiment.py --policy trees --out results/results_tree.csv
+python run_controls.py
+python analyze.py          # findings.md and all three figures
 ```
 
-Seeds are fixed (`SEEDS = [0, 1, 2]` in `run_experiment.py`) and evaluation
-initial conditions are pinned to a single seed shared across every config, so
-runs are deterministic given the same PyTorch version. Results here were
-produced with torch 2.13 / numpy 2.4 on CPU; minor numeric drift across torch
-versions is expected and should not move any conclusion.
+Training seeds are fixed at 0–9. Evaluation seed `12345 + s` is used for
+training seed `s`, so evaluation states vary across seeds while remaining
+paired across configurations. Results are deterministic given the same
+dependency versions; minor floating-point drift across platforms is expected.
 
 To rebuild the paper (requires a LaTeX distribution; compile from the
 repository root):

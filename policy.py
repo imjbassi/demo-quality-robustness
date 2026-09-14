@@ -1,8 +1,4 @@
-"""Behaviour-cloning policy, training loop, and the two evaluations.
-
-The model is deliberately small and identical across every run. The model is
-not the independent variable here -- the data is.
-"""
+"""Behaviour-cloning policies, training loops, and evaluation functions."""
 
 import numpy as np
 import torch
@@ -11,6 +7,9 @@ import torch.nn as nn
 from env2d import ACT_DIM, MAX_STEPS, OBS_DIM, Push2DVec, expert_action
 
 DEVICE = "cpu"
+# Small networks run faster and more predictably with one intra-op thread;
+# independent seeds can then be parallelized without CPU oversubscription.
+torch.set_num_threads(1)
 
 
 class BCPolicy(nn.Module):
@@ -24,6 +23,17 @@ class BCPolicy(nn.Module):
 
     def forward(self, x):
         return self.net(x)
+
+
+class TreePolicy:
+    """Adapter exposing a scikit-learn regressor as a policy."""
+
+    def __init__(self, model):
+        self.model = model
+
+    def __call__(self, x):
+        pred = self.model.predict(x.detach().cpu().numpy())
+        return torch.tensor(pred, dtype=torch.float32)
 
 
 def train_bc(obs, act, seed=0, epochs=30, batch=256, lr=1e-3):
@@ -43,6 +53,22 @@ def train_bc(obs, act, seed=0, epochs=30, batch=256, lr=1e-3):
             loss.backward()
             opt.step()
     return policy.eval()
+
+
+def train_tree_bc(obs, act, seed=0, n_estimators=40, min_samples_leaf=2,
+                  **_unused):
+    """Train an extremely-randomized-tree regression policy."""
+    from sklearn.ensemble import ExtraTreesRegressor
+
+    model = ExtraTreesRegressor(
+        n_estimators=n_estimators,
+        min_samples_leaf=min_samples_leaf,
+        max_features=1.0,
+        n_jobs=1,
+        random_state=seed,
+    )
+    model.fit(obs, act)
+    return TreePolicy(model)
 
 
 @torch.no_grad()

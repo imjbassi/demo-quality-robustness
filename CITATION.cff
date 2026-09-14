@@ -2,16 +2,19 @@ cff-version: 1.2.0
 message: "If you use this work, please cite it as below."
 title: "Not All Bad Demonstrations Are Equally Bad: Quantifying How Demonstration Failure Modes Degrade Closed-Loop Policy Performance"
 abstract: >-
-  A controlled simulation study treating demonstration quality, rather than
-  model architecture, as the independent variable. Five demonstration failure
-  modes are injected at controlled contamination rates into behaviour-cloning
-  datasets for a 2D block-pushing task, and the resulting policies are scored
-  with both open-loop action-prediction error and closed-loop task success.
+  A controlled simulation study treating demonstration quality as the
+  independent variable. Five failure modes are injected at controlled
+  contamination rates into behaviour-cloning datasets for a 2D block-pushing
+  task. Across two policy families, ten paired seeds, and transition-matched
+  controls, the study compares open-loop error with closed-loop task success.
 authors:
   - given-names: Jaiveer
     family-names: Bassi
-version: "1.0.0"
-date-released: "2026-09-13"
+    affiliation: Independent Researcher, USA
+    email: jaiveerbassi@yahoo.com
+    orcid: "https://orcid.org/0009-0006-3633-3220"
+version: "2.0.0"
+date-released: "2026-09-14"
 license: MIT
 keywords:
   - imitation learning

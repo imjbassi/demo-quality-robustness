@@ -26,6 +26,9 @@ Quantifying How Demonstration Failure Modes Degrade\\
 Closed-Loop Policy Performance}
 
 \author{Jaiveer Bassi\\
+\small Independent Researcher, USA\\
+\small\href{mailto:jaiveerbassi@yahoo.com}{jaiveerbassi@yahoo.com}\\
+\small ORCID: \href{https://orcid.org/0009-0006-3633-3220}{0009-0006-3633-3220}\\
 \small\url{https://github.com/imjbassi/demo-quality-robustness}}
 
 \date{September 2026}
@@ -36,26 +39,26 @@ Closed-Loop Policy Performance}
 \begin{abstract}
 \noindent
 Demonstration quality is often treated as a preprocessing concern in
-imitation learning. We instead hold architecture, hyperparameters, episode
-count, and evaluation conditions fixed while varying the type and prevalence
-of defective demonstrations. Five failure modes---occlusion, accidental
-success, corrective flailing, truncation, and inconsistent strategy---are
-introduced into behaviour-cloning datasets for a controlled 2D block-pushing
-task. Across 78 policy fits and three training seeds, outcomes differ sharply
-by defect type. At full contamination, mean closed-loop success is $0.963$
-for corrective flailing but $0.012$ for accidental success, compared with
-$0.972$ for clean data. Accidental-success data retains mean success of
-$0.890$ at $75\%$ contamination before collapsing at $100\%$. Pooled
-open-loop action-prediction error correlates strongly with closed-loop success
-($r=-0.91$), but within-mode correlations range from $-0.15$ to $-0.94$; in
-the descriptive band $[0.20,0.30]$, similar open-loop errors
-coincide with closed-loop success from $0.315$ to $0.980$. A control analysis
-also rejects our initial interpretation of the inconsistent-strategy result:
-the apparent degradation is explained by the alternate strategy's lower
-clonability, not by mixing itself. These simulation results motivate
-defect-specific quality control and closed-loop validation, while the small
-seed count and simplified dynamics limit quantitative generalisation. Code,
-raw results, and analysis are publicly available.
+imitation learning. We instead hold the task, dataset size, and training
+protocol fixed while varying the type and prevalence of defective
+demonstrations. Five failure modes---occlusion, accidental success, corrective
+flailing, truncation, and inconsistent strategy---are introduced into a
+controlled 2D block-pushing task. We train 520 policies across ten paired
+training/evaluation seeds using two policy families, then run 120 additional
+transition-matched controls. For the MLP, full-contamination success is
+$0.965$ for corrective flailing and $0.009$ for accidental success, versus
+$0.949$ for clean data. The paired changes are $+0.016\pm0.022$ and
+$-0.940\pm0.020$, respectively (95\% t intervals). Accidental success remains
+catastrophic for Extra Trees ($0.002$), but the ordering is otherwise
+policy-dependent: full occlusion yields $0.866$ success for the MLP and
+$0.990$ for trees, whereas truncation yields $0.962$ and $0.614$. Pooled MLP
+open-loop error correlates strongly with closed-loop success ($r=-0.92$), yet
+within-mode correlations range from $-0.13$ to $-0.95$; 49 policies in the
+descriptive MSE band $[0.20,0.30]$ span success from $0.130$ to $0.995$.
+Transition-matched controls confirm that the apparent inconsistent-strategy
+penalty is largely explained by alternate-strategy clonability rather than
+mixing itself. These results support defect- and policy-specific quality
+control and closed-loop validation, while remaining limited to simulation.
 \end{abstract}
 
 \section{Introduction}
@@ -86,15 +89,14 @@ This paper answers both questions in a deliberately small, fully controlled
 setting. Our contributions are:
 
 \begin{enumerate}\itemsep2pt
-\item A controlled experimental design treating demonstration quality as the
-independent variable, with contamination rate as a single comparable axis
-across five distinct failure modes.
-\item A descriptive ranking of failure modes by closed-loop degradation in a
-controlled block-pushing setting.
+\item A controlled design treating demonstration quality as the independent
+variable across five failure modes, ten paired seeds, and two policy families.
+\item Evidence that the most damaging defect is robust across policies while
+the relative cost of occlusion and truncation is policy-dependent.
 \item Evidence that a strong pooled association between open- and closed-loop
 metrics does not imply uniform diagnostic value within each failure mode.
-\item A control analysis showing that an apparent strategy-inconsistency
-effect is instead explained by unequal strategy clonability.
+\item Episode- and transition-matched controls showing that an apparent
+strategy-inconsistency effect is instead dominated by unequal clonability.
 \end{enumerate}
 
 \section{Method}
@@ -131,7 +133,7 @@ from a wider staging radius, producing a visibly different route through state
 space. It was explicitly tuned until it \emph{also} reaches
 $\mathbf{100.0\%}$, so that mixing the two tests strategy \emph{inconsistency}
 rather than strategy \emph{quality}. This tuning turns out to matter
-substantially (Section~\ref{sec:failed}).
+substantially (Section~\ref{sec:controls}).
 
 The \textbf{naive controller} charges blindly at the block and never reasons
 about the goal; the block travels along whatever ray the gripper started on.
@@ -172,7 +174,7 @@ touches actions replays the episode through the environment.
 pipeline applies.} Modes are rejection-sampled to successful episodes only.
 Truncation is the deliberate exception, since it \emph{is} the filter failing.
 
-\subsection{Sweep axis, policy and evaluation}
+\subsection{Sweep, policies, evaluation and uncertainty}
 
 The sweep axis is \textbf{contamination rate} $\rho$, not per-episode
 severity. Every dataset contains the same number of episodes; $\rho$ of them
@@ -181,20 +183,26 @@ This places all five modes on one comparable axis and answers the question a
 pipeline actually asks: what fraction of the dataset can be this kind of bad
 before the policy breaks?
 
-We sweep $\rho \in \{0, 0.25, 0.5, 0.75, 0.9, 1.0\}$ across three training
-seeds. The shared clean baseline is fitted once per seed, giving 78 distinct
-policy fits: three clean fits and $5\times5\times3$ contaminated fits. Every
-run uses an identical $2\times256$ ReLU MLP trained
-with MSE behaviour cloning for 50 epochs on 400 episodes ($\approx$13k
-transitions). The model is deliberately small: it is not the independent
-variable.
+We sweep $\rho \in \{0, 0.25, 0.5, 0.75, 0.9, 1.0\}$ across ten training
+seeds. The shared clean baseline is fitted once per seed, producing 260 fits
+per policy family: ten clean fits and $5\times5\times10$ contaminated fits.
+The primary policy is a $2\times256$ ReLU MLP trained by MSE behaviour cloning
+for 50 epochs. A robustness sweep uses an Extra Trees regressor with 40 trees
+and a minimum leaf size of two \cite{geurts2006extratrees}. Both train on the
+same 400-episode datasets.
+
+Because alternate-strategy episodes are longer, we add a control that fixes
+the dataset at 13,000 transitions and defines $\rho$ as the exact fraction of
+transitions drawn from that strategy. Repeating all six mixture levels for
+both policy families and ten seeds adds 120 fits, for 640 fits in total.
 
 Two metrics are recorded per policy. \textbf{Open-loop MSE} is
-action-prediction error against the expert on held-out \emph{clean} expert
-states (cheap, offline, no environment interaction). \textbf{Closed-loop
-success rate} runs the policy in the environment over 200 episodes. The same
-200 evaluation initial conditions are reused for every configuration to
-support paired descriptive comparisons.
+action-prediction error against 300 held-out \emph{clean} expert episodes.
+\textbf{Closed-loop success rate} runs the policy over 200 episodes. Evaluation
+seed $12345+s$ is used for training seed $s$: evaluation states vary across
+seeds but are paired across configurations within a seed. We report means and
+two-sided 95\% Student-t intervals across the ten paired seeds; full-
+contamination changes are paired against the corresponding clean fit.
 
 \begin{figure*}[t]
 \centering
@@ -203,34 +211,34 @@ support paired descriptive comparisons.
 closed-loop success rate, the quantity of interest. \textbf{Right:} open-loop
 MSE, the offline proxy. Accidental-success policies retain high mean success at
 $\rho=0.75$ before collapsing at $\rho=1.0$, whereas corrective flailing and
-truncation remain comparatively stable. Points are means and error bars are
-standard deviations over three training seeds.}
+truncation remain comparatively stable. Points are MLP means and error bars
+are 95\% t intervals over ten paired seeds.}
 \label{fig:dose}
 \end{figure*}
 
 \section{Results}
 
-The clean baseline reaches $0.972 \pm 0.010$ closed-loop success (mean $\pm$
-standard deviation over three training seeds). All uncertainty summaries are
-descriptive; the small seed count does not support formal significance claims.
+The MLP clean baseline reaches $0.949\pm0.015$ closed-loop success (mean and
+95\% t-interval half-width); the Extra Trees baseline reaches
+$0.996\pm0.003$.
 
 \subsection{Failure modes are not interchangeable}
 
 Table~\ref{tab:main} gives the headline comparison. At full contamination,
-corrective flailing reduces mean success by $0.009$ relative to the clean
-baseline, whereas accidental success reduces it by $0.960$. Both are ``bad
+corrective flailing changes MLP mean success by $+0.016\pm0.022$ relative to
+the paired clean baseline, whereas accidental success changes it by
+$-0.940\pm0.020$. Both are ``bad
 demonstrations'' under a practical taxonomy, yet their observed costs differ
-by two orders of magnitude.
+sharply.
 
 \textbf{Corrective flailing causes little degradation in this setting.}
 Jitter-then-recover trajectories may provide DAgger-like coverage of
-off-distribution states \cite{ross2011dagger}; at $\rho=1.0$, mean success is
-$0.963$, close to the clean baseline. This pattern makes corrective flailing a
-lower QC priority here, although three seeds are insufficient to establish
-equivalence or benefit.
+off-distribution states \cite{ross2011dagger}; at $\rho=1.0$, MLP mean success
+is $0.965\pm0.015$. The paired interval includes zero change, so these data do
+not establish a benefit, but they make flailing a lower QC priority here.
 
 \textbf{Truncation does not reduce mean success in the observed setting}:
-mean success is $0.987$ at $\rho=1.0$. A plausible explanation is that the push action can be
+MLP mean success is $0.962\pm0.017$ at $\rho=1.0$. A plausible explanation is that the push action can be
 extrapolated from the retained approach phase. This interpretation should not
 be transferred to tasks with a distinct terminal phase, such as grasping,
 without further experiments.
@@ -242,49 +250,49 @@ without further experiments.
 \toprule
 \textbf{Failure mode} & $\rho{=}0.5$ & $\rho{=}1.0$ & Pearson $r$ \\
 \midrule
-Corrective flailing    & 0.972 & 0.963 & $-0.35$ \\
-Truncated episodes     & 0.930 & 0.987 & $-0.15$ \\
-Occlusion (stale obs)  & 0.910 & 0.867 & $-0.58$ \\
-Inconsistent strategy  & 0.933 & 0.303 & $-0.90$ \\
-Accidental success     & 0.965 & \textbf{0.012} & $-0.94$ \\
+Corrective flailing    & 0.963 & 0.965 & $-0.26$ \\
+Truncated episodes     & 0.940 & 0.962 & $-0.13$ \\
+Occlusion (stale obs)  & 0.905 & 0.866 & $-0.64$ \\
+Inconsistent strategy  & 0.934 & 0.229 & $-0.89$ \\
+Accidental success     & 0.939 & \textbf{0.009} & $-0.95$ \\
 \midrule
-\textit{Clean baseline} & \multicolumn{2}{c}{\textit{0.972}} & n/a \\
+\textit{Clean baseline} & \multicolumn{2}{c}{\textit{0.949}} & n/a \\
 \bottomrule
 \end{tabular}
-\caption{Closed-loop success rate by failure mode and contamination rate, mean
-over three seeds. Pearson $r$ is the within-mode correlation between open-loop
-MSE and closed-loop success across all runs of that mode.}
+\caption{MLP closed-loop success by failure mode and contamination rate, mean
+over ten seeds. Pearson $r$ is the descriptive within-mode correlation between
+open-loop MSE and closed-loop success across 60 fits per mode.}
 \label{tab:main}
 \end{table}
 
 \subsection{Accidental success is a cliff, not a slope}
 
 The most operationally significant observed result is the shape of the accidental
-success curve: $0.965$ at $\rho=0.5$, $0.890$ at $\rho=0.75$, $0.747$ at
-$\rho=0.9$, and $\mathbf{0.012}$ at $\rho=1.0$.
+success curve: $0.939$ at $\rho=0.5$, $0.917$ at $\rho=0.75$, $0.666$ at
+$\rho=0.9$, and $\mathbf{0.009}$ at $\rho=1.0$.
 
 In this experiment, a minority of clean demonstrations masks much of the
 problem. A pipeline monitoring only success-labelled demonstration throughput
 would not reveal the approaching policy failure. The
-diagnostic wrong-side push rate tells the same story, rising from $0.008$ at
-$\rho=0.5$ to $0.468$ at $\rho=1.0$: the policy has learned to shove the block
+diagnostic wrong-side push rate tells the same story, rising from $0.011$ at
+$\rho=0.5$ to $0.415$ at $\rho=1.0$: the policy has learned to shove the block
 in essentially arbitrary directions.
 
 \subsection{Open-loop evaluation has failure-mode-dependent value}
 
-Pooled across all 78 distinct policy fits, open-loop MSE correlates with
-closed-loop success at $r=-0.91$. This strong aggregate association could
+Pooled across all 260 distinct MLP fits, open-loop MSE correlates with
+closed-loop success at $r=-0.92$. This strong aggregate association could
 appear to justify its use as a screening metric.
 
-Broken out by failure mode, however, Pearson correlations range from $-0.15$
-(truncation) to $-0.94$ (accidental success). The metric is strongly
+Broken out by failure mode, however, Pearson correlations range from $-0.13$
+(truncation) to $-0.95$ (accidental success). The metric is strongly
 associated with success for some defects but weakly associated for truncation
 and corrective flailing, precisely where closed-loop performance varies
 little.
 
-A complementary descriptive comparison considers the 15 runs whose open-loop
+A complementary descriptive comparison considers the 49 runs whose open-loop
 MSE falls in the descriptive band $[0.20,0.30]$. Their closed-loop success
-ranges from $\mathbf{0.315}$ to $\mathbf{0.980}$. This band is not a
+ranges from $\mathbf{0.130}$ to $\mathbf{0.995}$. This band is not a
 statistical equivalence test; it illustrates that numerically similar offline
 scores need not determine similar task outcomes. Figure~\ref{fig:scatter}
 shows the full distribution, including the high-MSE collapse points that
@@ -293,112 +301,111 @@ contribute strongly to the pooled correlation.
 \begin{figure}[t]
 \centering
 \includegraphics[width=\columnwidth]{results/fig2_openloop_vs_closedloop.png}
-\caption{Open-loop MSE against closed-loop success for all 78 distinct policy
+\caption{Open-loop MSE against closed-loop success for all 260 distinct MLP
 fits. Within the descriptive MSE band $[0.20,0.30]$, closed-loop success spans
-$0.665$.}
+$0.865$.}
 \label{fig:scatter}
 \end{figure}
 
-\section{A prediction that failed}
-\label{sec:failed}
+\section{Robustness controls}
+\label{sec:controls}
 
-We predicted that mixing two valid strategies would cause multimodal-averaging
-collapse, since an MSE-regression policy averages conflicting action targets by
-construction. The data does not support this, and the control is worth stating
-explicitly because it nearly produced a false positive.
+\subsection{Policy family changes the ranking}
 
-At $\rho=1.0$ the dataset is entirely alternate-strategy and therefore fully
-self-consistent; there is no mixing left to blame. Success there ($0.303$) is
-the \emph{clonability floor} of that strategy, not evidence of inconsistency
-harm. Both experts solve the task on 100\% of episodes; the alternate is
-simply harder to clone, having a longer horizon and more orbit steps over
-which error compounds.
+Table~\ref{tab:policies} repeats the full-contamination comparison with Extra
+Trees. Accidental success remains catastrophic and corrective flailing remains
+benign. The middle of the ranking changes substantially: trees are robust to
+stale observations but sensitive to truncation, whereas the MLP shows the
+opposite pattern. Demonstration defects therefore interact with policy
+inductive bias; only the extreme cases are stable enough here to support a
+cross-policy priority.
 
-Reading intermediate $\rho$ against the line joining the two endpoints
-isolates any harm attributable to mixing:
-
-\begin{table}[h]
+\begin{table}[t]
 \centering
 \small
-\begin{tabular}{@{}cccc@{}}
+\begin{tabular}{@{}lcc@{}}
 \toprule
-$\rho$ & Observed & Interpolated & Residual \\
+\textbf{Failure mode} & \textbf{MLP} & \textbf{Extra Trees} \\
 \midrule
-0.25 & 0.972 & 0.805 & $+0.167$ \\
-0.50 & 0.933 & 0.637 & $+0.296$ \\
-0.75 & 0.728 & 0.470 & $+0.258$ \\
-0.90 & 0.358 & 0.370 & $-0.012$ \\
+Corrective flailing    & $0.965\pm0.015$ & $0.993\pm0.007$ \\
+Truncated episodes     & $0.962\pm0.017$ & $0.614\pm0.033$ \\
+Occlusion (stale obs)  & $0.866\pm0.038$ & $0.990\pm0.006$ \\
+Inconsistent strategy  & $0.229\pm0.102$ & $0.142\pm0.050$ \\
+Accidental success     & $0.009\pm0.008$ & $0.002\pm0.003$ \\
 \bottomrule
 \end{tabular}
-\caption{Observed success relative to linear interpolation between the
-$\rho=0$ and $\rho=1$ endpoints. Positive residuals indicate performance
-\emph{above}, not below, the clonability-only interpolation.}
-\label{tab:clon}
+\caption{Closed-loop success at $\rho=1.0$ (mean $\pm$ 95\% t-interval
+half-width over ten paired seeds).}
+\label{tab:policies}
 \end{table}
 
-The residual is non-negative at three of four intermediate points and slightly
-negative at $\rho=0.9$. Thus, the observations provide no consistent evidence
-that mixing is worse than the clonability-only interpolation; at lower
-contamination rates, clean data may instead be protective. The
-inconsistent-strategy curve in
-Figure~\ref{fig:dose} looks damaging only because one of the two strategies is
-intrinsically harder to imitate.
+\subsection{Strategy mixing under transition matching}
 
-This control materially qualifies the headline comparison. Removing the
-inconsistent-strategy runs from the matched-MSE band narrows the closed-loop
-spread from $0.665$ to approximately $0.22$. This narrower descriptive spread
-is considerably more modest than the raw figure suggests.
+We initially predicted that mixing two valid strategies would cause
+multimodal-averaging collapse. The endpoint control contradicts that reading:
+at $\rho=1.0$ the dataset is fully self-consistent, so its low success is a
+\emph{clonability floor}, not evidence of mixing harm. Under episode matching,
+the MLP's observed success exceeds the line between its $\rho=0$ and $\rho=1$
+endpoints at every intermediate mixture.
+
+The stricter transition-matched control fixes both total transitions and the
+alternate-strategy transition fraction. Its intermediate MLP means are
+$0.962$, $0.966$, $0.741$, and $0.386$; Extra Trees means are $0.984$,
+$0.888$, $0.797$, and $0.563$. Every point remains above the corresponding
+endpoint interpolation. Across both matching schemes, these curves support
+unequal clonability, rather than strategy conflict, as the dominant
+explanation; the complete control plot is included in the repository.
 
 \section{Limitations}
 
-\textbf{Three training seeds are insufficient for precise inference.} Some
-cells are noisy: occlusion at $\rho=1.0$ spans $0.735$ to $0.955$ across
-seeds. The means and standard deviations therefore describe these runs rather
-than establish population-level effects; confirmatory work should use more
-seeds and report uncertainty intervals.
+\textbf{Controlled simulation only.} Push2D omits 3D geometry, contact
+uncertainty, visual perception, and hardware latency. The study tests a method
+for isolating defect effects, not transferable numerical thresholds.
 
-\textbf{One fixed evaluation set.} Reusing the same 200 initial conditions
-reduces between-configuration nuisance variation but does not measure
-sensitivity to the evaluation-state distribution. Replication should vary
-both training and evaluation seeds.
+\textbf{Two deterministic regressors.} The MLP and Extra Trees differ in
+inductive bias, but both return point actions. Multimodal generative policies,
+including diffusion policies \cite{chi2023diffusion}, may respond differently
+to inconsistent strategies.
 
-\textbf{A 2D toy environment.} Whether these rankings survive in a 7-DOF
-setting with contact dynamics and visual observations is open. This work
-establishes a methodology, not transferable constants.
+\textbf{Finite seed and evaluation coverage.} Ten paired seeds materially
+improve precision, and evaluation states vary by seed, but each fit is still
+tested on only 200 initial conditions from the same simulator distribution.
 
-\textbf{One policy class.} MSE regression averages multimodal action
-distributions by construction. The inconsistent-strategy result in particular
-may be specific to this choice; replicating it with a diffusion policy
-\cite{chi2023diffusion} is the most informative single follow-up.
+\textbf{Exploratory analysis.} The failure modes and MSE band were not
+preregistered, and intervals are not adjusted for multiple comparisons. They
+quantify run-to-run uncertainty rather than establish universal effects.
 
-\textbf{Transition imbalance.} Alternate-strategy episodes are longer, so at
-fixed episode count they contribute more transitions. A transition-matched
-replication would tighten that arm further.
+\textbf{Scripted demonstrations.} Programmatic defects provide exact control
+but do not capture the full diversity or temporal dependence of human data-
+collection errors.
 
 \section{Conclusion}
 
-Treating demonstration quality as the independent variable, rather than an
-implementation detail, produces a defect-specific ranking in this controlled
-task: accidental-success performance collapses near full contamination,
-occlusion produces a moderate decline, and corrective flailing and truncation
-remain comparatively stable. The practical hypothesis for larger systems is
-that QC effort should be allocated by defect type rather than uniformly.
+Treating demonstration quality as the independent variable reveals both
+stable and policy-dependent effects. Accidental-success data is catastrophic
+near full contamination and corrective flailing is consistently benign, but
+occlusion and truncation exchange rank across the MLP and Extra Trees. The
+practical hypothesis is therefore interaction-aware: QC effort should depend
+on both defect type and the intended learner.
 
 The evaluation result is equally important: open-loop action-prediction error
 has a strong pooled association with closed-loop success, yet its diagnostic
-value varies substantially by failure mode. Offline screening is useful, but
-it is not a substitute for closed-loop validation.
+value varies substantially by failure mode. The transition-matched analysis
+also turns an apparent inconsistency penalty into a clonability result.
+Offline screening and endpoint controls are useful, but neither substitutes
+for closed-loop validation.
 
 \section*{Reproducibility statement}
 
 Source code, exact training and evaluation seeds, raw per-run results, and the
-scripts used to generate both figures are available at
+scripts used to generate all three figures are available at
 \url{https://github.com/imjbassi/demo-quality-robustness}. The repository also
-records the software requirements and commands needed to reproduce all 78
+records the software requirements and commands needed to reproduce all 640
 policy fits and rebuild this manuscript.
 
 \begin{thebibliography}{9}
 \small
+\setlength{\itemsep}{0pt}
 \bibitem{pomerleau1989alvinn}
 D.~Pomerleau. ALVINN: An Autonomous Land Vehicle in a Neural Network.
 \textit{NeurIPS}, 1989.
@@ -418,6 +425,10 @@ S.~Belkhale, Y.~Cui, and D.~Sadigh. Data Quality in Imitation Learning.
 \bibitem{chi2023diffusion}
 C.~Chi et al. Diffusion Policy: Visuomotor Policy Learning via Action
 Diffusion. \textit{RSS}, 2023.
+
+\bibitem{geurts2006extratrees}
+P.~Geurts, D.~Ernst, and L.~Wehenkel. Extremely Randomized Trees.
+\textit{Machine Learning}, 63(1):3--42, 2006.
 \end{thebibliography}
 
 \end{document}
