@@ -38,27 +38,23 @@ Closed-Loop Policy Performance}
 
 \begin{abstract}
 \noindent
-Demonstration quality is often treated as a preprocessing concern in
-imitation learning. We instead hold the task, dataset size, and training
-protocol fixed while varying the type and prevalence of defective
-demonstrations. Five failure modes---occlusion, accidental success, corrective
-flailing, truncation, and inconsistent strategy---are introduced into a
-controlled 2D block-pushing task. We train 520 policies across ten paired
-training/evaluation seeds using two policy families, then run 120 additional
-transition-matched controls. For the MLP, full-contamination success is
-$0.965$ for corrective flailing and $0.009$ for accidental success, versus
-$0.949$ for clean data. The paired changes are $+0.016\pm0.022$ and
-$-0.940\pm0.020$, respectively (95\% t intervals). Accidental success remains
-catastrophic for Extra Trees ($0.002$), but the ordering is otherwise
-policy-dependent: full occlusion yields $0.866$ success for the MLP and
-$0.990$ for trees, whereas truncation yields $0.962$ and $0.614$. Pooled MLP
-open-loop error correlates strongly with closed-loop success ($r=-0.92$), yet
-within-mode correlations range from $-0.13$ to $-0.95$; 49 policies in the
-descriptive MSE band $[0.20,0.30]$ span success from $0.130$ to $0.995$.
-Transition-matched controls confirm that the apparent inconsistent-strategy
-penalty is largely explained by alternate-strategy clonability rather than
-mixing itself. These results support defect- and policy-specific quality
-control and closed-loop validation, while remaining limited to simulation.
+We isolate five demonstration defects in a controlled 2D block-pushing task
+while holding task, dataset size, and training protocol fixed. Across 640
+policy fits, ten paired seeds, two policy families, and a transition-matched
+control, defect cost is not determined by retained primary-expert action
+information. At full contamination, accidental-success and occlusion data
+have nearly equal label-fidelity MSE ($0.207$ and $0.212$), yet MLP rollout
+success is $0.009$ and $0.866$; inconsistent-strategy data has worse label
+fidelity ($0.475$) but higher success ($0.229$). Thus the robust result is not
+merely that low-fidelity labels are harmful: accidental success exhibits a
+late cliff, while the middle ranking changes with policy class. Offline
+evaluation is similarly non-identifying: 49 policies with open-loop MSE in
+$[0.20,0.30]$ span success from $0.130$ to $0.995$. The alternate controller
+is exactly Markovian in the recorded 10-D state and its state-only oracle
+succeeds on every rollout; nevertheless, its MLP clone attains low held-out
+one-step error ($0.0568$) but only $0.229$ success. This separates observation
+adequacy from closed-loop clonability and supports defect- and
+learner-specific quality control rather than a universal data-quality score.
 \end{abstract}
 
 \section{Introduction}
@@ -70,20 +66,30 @@ where its predictions degrade further \cite{ross2011dagger}. The standard
 responses to this are architectural or algorithmic: better policy classes
 \cite{chi2023diffusion}, or interactive data collection.
 
-Practitioners running data-collection pipelines know something the literature
-under-quantifies: the demonstrations themselves fail in structured,
-recognisable ways. A camera is occluded mid-episode. An operator fumbles and
-the object lands on the goal anyway. Two operators solve the same task with
-incompatible strategies. An episode is cut short. These are not Gaussian noise
-on a clean signal; they are distinct defects with distinct structure, and
-quality-control effort spent on one is effort not spent on another.
+Demonstrations fail in structured ways: a camera is occluded, an operator
+fumbles into success, strategies disagree, or an episode ends early. These
+defects differ in whether states, actions, temporal coverage, or strategy are
+altered. A finite quality-control budget therefore raises a narrower question
+than whether ``better data helps'': after accounting for retained expert
+action information, do defect type and learner still change the outcome?
 
-Prior work has established that demonstration quality matters in aggregate
-\cite{mandlekar2021what,belkhale2023data}. What is less established is a
-\emph{ranking}: given finite QC budget, which defect should a pipeline
-prioritise? And, because closed-loop evaluation is expensive and open-loop
-action-prediction error is cheap, does the cheap metric even detect the
-damage?
+\subsection{Related work and scope}
+
+RoboMimic established that offline human-data quality and the mismatch between
+training and rollout objectives materially affect robot-learning conclusions
+\cite{mandlekar2021what}. Belkhale et al. separately study data quality in
+imitation learning \cite{belkhale2023data}. Methods for imperfect or
+suboptimal demonstrations commonly estimate confidence or importance weights
+\cite{wu2019imperfect,wang2021weight}, or learn discriminator-derived BC
+weights \cite{xu2022dwbc}. Other work critiques and filters heterogeneous
+demonstrations \cite{kuhar2023discern} or retrieves relevant behaviours from
+larger datasets \cite{du2023retrieval}. These methods ask how to learn despite
+mixed-quality data. Our smaller contribution is diagnostic: compare named
+pipeline defects at controlled prevalence, measure their primary-expert label
+fidelity directly, and test whether offline action error identifies the
+resulting closed-loop damage. RoboMimic's observation that training and
+rollout objectives can select different checkpoints motivates, rather than
+conflicts with, this controlled comparison \cite{mandlekar2021what}.
 
 This paper answers both questions in a deliberately small, fully controlled
 setting. Our contributions are:
@@ -91,12 +97,12 @@ setting. Our contributions are:
 \begin{enumerate}\itemsep2pt
 \item A controlled design treating demonstration quality as the independent
 variable across five failure modes, ten paired seeds, and two policy families.
-\item Evidence that the most damaging defect is robust across policies while
-the relative cost of occlusion and truncation is policy-dependent.
-\item Evidence that a strong pooled association between open- and closed-loop
-metrics does not imply uniform diagnostic value within each failure mode.
-\item Episode- and transition-matched controls showing that an apparent
-strategy-inconsistency effect is instead dominated by unequal clonability.
+\item A label-fidelity control showing that full-contamination performance is
+not monotone in disagreement with the primary expert.
+\item A similar-offline-score comparison showing that open-loop MSE does not
+uniquely identify closed-loop success; nested correlations are secondary.
+\item Policy-, transition-, and state-only-oracle controls separating defect
+effects, strategy mixing, observation adequacy, and clonability.
 \end{enumerate}
 
 \section{Method}
@@ -133,7 +139,9 @@ from a wider staging radius, producing a visibly different route through state
 space. It was explicitly tuned until it \emph{also} reaches
 $\mathbf{100.0\%}$, so that mixing the two tests strategy \emph{inconsistency}
 rather than strategy \emph{quality}. This tuning turns out to matter
-substantially (Section~\ref{sec:controls}).
+substantially (Section~\ref{sec:controls}). Importantly, the controller is a
+deterministic function of the current 10-D observation; it has no hidden
+memory or history input.
 
 The \textbf{naive controller} charges blindly at the block and never reasons
 about the goal; the block travels along whatever ray the gripper started on.
@@ -187,9 +195,13 @@ We sweep $\rho \in \{0, 0.25, 0.5, 0.75, 0.9, 1.0\}$ across ten training
 seeds. The shared clean baseline is fitted once per seed, producing 260 fits
 per policy family: ten clean fits and $5\times5\times10$ contaminated fits.
 The primary policy is a $2\times256$ ReLU MLP trained by MSE behaviour cloning
-for 50 epochs. A robustness sweep uses an Extra Trees regressor with 40 trees
-and a minimum leaf size of two \cite{geurts2006extratrees}. Both train on the
-same 400-episode datasets.
+for 50 epochs with Adam, learning rate $10^{-3}$, batch size 256, and no
+weight decay. A robustness sweep uses an Extra Trees regressor with 40 trees,
+all input features available at each split, and a minimum leaf size of two
+\cite{geurts2006extratrees}. Both train on the same 400-episode datasets.
+Because episode length varies, these contain 5,957--19,180 transitions across
+the sweep (clean datasets average 12,207); the transition-matched control below
+removes this variation.
 
 Because alternate-strategy episodes are longer, we add a control that fixes
 the dataset at 13,000 transitions and defines $\rho$ as the exact fraction of
@@ -201,8 +213,17 @@ action-prediction error against 300 held-out \emph{clean} expert episodes.
 \textbf{Closed-loop success rate} runs the policy over 200 episodes. Evaluation
 seed $12345+s$ is used for training seed $s$: evaluation states vary across
 seeds but are paired across configurations within a seed. We report means and
-two-sided 95\% Student-t intervals across the ten paired seeds; full-
-contamination changes are paired against the corresponding clean fit.
+two-sided 95\% Student-t intervals across the ten paired seeds;
+full-contamination changes are paired against the corresponding clean fit.
+
+Two diagnostics address alternative explanations. \textbf{Label fidelity} is
+the MSE between each logged demonstration action and the primary expert's
+action evaluated on that same logged observation, summarized over ten
+independently generated full-contamination datasets per mode. This quantity
+measures retained primary-expert action information, not trajectory success.
+For the alternate strategy, we also evaluate cloned-policy MSE on 300 held-out
+alternate-expert episodes and compare its rollout success with the original
+state-only alternate controller on the same evaluation seeds.
 
 \begin{figure*}[t]
 \centering
@@ -222,7 +243,7 @@ The MLP clean baseline reaches $0.949\pm0.015$ closed-loop success (mean and
 95\% t-interval half-width); the Extra Trees baseline reaches
 $0.996\pm0.003$.
 
-\subsection{Failure modes are not interchangeable}
+\subsection{The ranking is not explained by label fidelity}
 
 Table~\ref{tab:main} gives the headline comparison. At full contamination,
 corrective flailing changes MLP mean success by $+0.016\pm0.022$ relative to
@@ -230,6 +251,18 @@ the paired clean baseline, whereas accidental success changes it by
 $-0.940\pm0.020$. Both are ``bad
 demonstrations'' under a practical taxonomy, yet their observed costs differ
 sharply.
+
+That contrast alone could be tautological because flailing retains mostly
+expert actions whereas accidental success does not. The explicit fidelity
+control rejects a one-dimensional explanation. Accidental-success and
+occlusion labels have nearly identical disagreement with the primary expert
+($0.207$ versus $0.212$ MSE), but their full-contamination success differs by
+$0.857$. Inconsistent-strategy labels disagree most ($0.475$) yet clone far
+better than accidental-success data. Truncation has essentially perfect label
+fidelity but is benign for the MLP and damaging for Extra Trees
+(Section~\ref{sec:controls}). Performance is therefore not monotone in retained
+primary-expert action information. The narrower robust claim is the accidental
+success cliff and a policy-dependent middle ranking.
 
 \textbf{Corrective flailing causes little degradation in this setting.}
 Jitter-then-recover trajectories may provide DAgger-like coverage of
@@ -248,20 +281,20 @@ without further experiments.
 \small
 \begin{tabular}{@{}lccc@{}}
 \toprule
-\textbf{Failure mode} & $\rho{=}0.5$ & $\rho{=}1.0$ & Pearson $r$ \\
+\textbf{Failure mode} & Label MSE & $\rho{=}0.5$ & $\rho{=}1.0$ \\
 \midrule
-Corrective flailing    & 0.963 & 0.965 & $-0.26$ \\
-Truncated episodes     & 0.940 & 0.962 & $-0.13$ \\
-Occlusion (stale obs)  & 0.905 & 0.866 & $-0.64$ \\
-Inconsistent strategy  & 0.934 & 0.229 & $-0.89$ \\
-Accidental success     & 0.939 & \textbf{0.009} & $-0.95$ \\
+Corrective flailing    & 0.066 & 0.963 & 0.965 \\
+Truncated episodes     & 0.000 & 0.940 & 0.962 \\
+Occlusion (stale obs)  & 0.212 & 0.905 & 0.866 \\
+Inconsistent strategy  & 0.475 & 0.934 & 0.229 \\
+Accidental success     & 0.207 & 0.939 & \textbf{0.009} \\
 \midrule
-\textit{Clean baseline} & \multicolumn{2}{c}{\textit{0.949}} & n/a \\
+\textit{Clean baseline} & 0.000 & \multicolumn{2}{c}{\textit{0.949}} \\
 \bottomrule
 \end{tabular}
-\caption{MLP closed-loop success by failure mode and contamination rate, mean
-over ten seeds. Pearson $r$ is the descriptive within-mode correlation between
-open-loop MSE and closed-loop success across 60 fits per mode.}
+\caption{Primary-expert label-fidelity MSE at full contamination and MLP
+closed-loop success by contamination rate, means over ten seeds. Label MSE
+compares logged actions with primary-expert actions on the same logged states.}
 \label{tab:main}
 \end{table}
 
@@ -280,32 +313,52 @@ in essentially arbitrary directions.
 
 \subsection{Open-loop evaluation has failure-mode-dependent value}
 
-Pooled across all 260 distinct MLP fits, open-loop MSE correlates with
-closed-loop success at $r=-0.92$. This strong aggregate association could
-appear to justify its use as a screening metric.
+The primary evidence is a similar-score comparison: among the 49 runs whose
+open-loop MSE lies in the descriptive band $[0.20,0.30]$, closed-loop success
+ranges from $\mathbf{0.130}$ to $\mathbf{0.995}$. The band was selected after
+inspection and is not a statistical equivalence test; it demonstrates
+non-identification---numerically similar offline scores can accompany nearly
+the full range of task outcomes. Figure~\ref{fig:scatter} shows the complete
+distribution.
 
-Broken out by failure mode, however, Pearson correlations range from $-0.13$
-(truncation) to $-0.95$ (accidental success). The metric is strongly
-associated with success for some defects but weakly associated for truncation
-and corrective flailing, precisely where closed-loop performance varies
-little.
-
-A complementary descriptive comparison considers the 49 runs whose open-loop
-MSE falls in the descriptive band $[0.20,0.30]$. Their closed-loop success
-ranges from $\mathbf{0.130}$ to $\mathbf{0.995}$. This band is not a
-statistical equivalence test; it illustrates that numerically similar offline
-scores need not determine similar task outcomes. Figure~\ref{fig:scatter}
-shows the full distribution, including the high-MSE collapse points that
-contribute strongly to the pooled correlation.
+Correlations provide secondary context. Pooled across all 260 distinct MLP
+fits, open-loop MSE correlates with success at $r=-0.92$, but this aggregate is
+driven partly by between-mode separation and high-MSE collapse points.
+Within-mode coefficients range from $-0.13$ to $-0.95$. Table~\ref{tab:range}
+makes the associated range restriction explicit: truncation and flailing have
+success SDs near $0.03$, so their weak coefficients are not evidence that MSE
+would fail over a wider outcome range. Each coefficient is descriptive over
+60 observations nested within ten seeds and six contamination levels; the
+points are not independent draws and no correlation significance test is
+claimed.
 
 \begin{figure}[t]
 \centering
 \includegraphics[width=\columnwidth]{results/fig2_openloop_vs_closedloop.png}
 \caption{Open-loop MSE against closed-loop success for all 260 distinct MLP
 fits. Within the descriptive MSE band $[0.20,0.30]$, closed-loop success spans
-$0.865$.}
+the range $0.130$ to $0.995$.}
 \label{fig:scatter}
 \end{figure}
+
+\begin{table}[t]
+\centering
+\small
+\begin{tabular}{@{}lccc@{}}
+\toprule
+\textbf{Failure mode} & MSE SD & Success SD & Pearson $r$ \\
+\midrule
+Corrective flailing   & 0.007 & 0.030 & $-0.26$ \\
+Truncated episodes    & 0.010 & 0.029 & $-0.13$ \\
+Occlusion             & 0.026 & 0.046 & $-0.64$ \\
+Inconsistent strategy & 0.070 & 0.312 & $-0.89$ \\
+Accidental success    & 0.117 & 0.347 & $-0.95$ \\
+\bottomrule
+\end{tabular}
+\caption{Within-mode sample SDs and descriptive correlations over 60 nested
+seed-by-contamination fits per mode.}
+\label{tab:range}
+\end{table}
 
 \section{Robustness controls}
 \label{sec:controls}
@@ -339,7 +392,7 @@ half-width over ten paired seeds).}
 \label{tab:policies}
 \end{table}
 
-\subsection{Strategy mixing under transition matching}
+\subsection{Strategy mixing and observation adequacy}
 
 We initially predicted that mixing two valid strategies would cause
 multimodal-averaging collapse. The endpoint control contradicts that reading:
@@ -354,7 +407,30 @@ $0.962$, $0.966$, $0.741$, and $0.386$; Extra Trees means are $0.984$,
 $0.888$, $0.797$, and $0.563$. Every point remains above the corresponding
 endpoint interpolation. Across both matching schemes, these curves support
 unequal clonability, rather than strategy conflict, as the dominant
-explanation; the complete control plot is included in the repository.
+explanation (Figure~\ref{fig:strategy-control}).
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=\columnwidth]{results/fig3_strategy_controls.png}
+\caption{Episode-matched and transition-matched strategy controls. Points are
+means and error bars are 95\% t intervals over ten paired seeds. Every
+intermediate mixture is above the linearly interpolated endpoint expectation;
+the low alternate-only endpoint is therefore a clonability floor, not a
+mixing penalty.}
+\label{fig:strategy-control}
+\end{figure}
+
+The proposed hidden-history explanation for that floor does not hold here:
+the alternate controller is implemented as a deterministic function of the
+current 10-D observation. The state-only oracle succeeds on all 2,000
+evaluation rollouts across the ten seeds. An MLP trained only on alternate
+demonstrations also achieves held-out alternate-trajectory MSE
+$0.0568\pm0.0041$, yet closed-loop success remains $0.229\pm0.102$ (95\%
+t-interval half-widths). Observation is therefore sufficient for the scripted
+expert, while one-step regression is not sufficient for a robust clone. This
+pattern is consistent with compounding error or sensitivity near the
+controller's switching geometry, but the present diagnostic does not identify
+which mechanism dominates.
 
 \section{Limitations}
 
@@ -376,24 +452,27 @@ preregistered, and intervals are not adjusted for multiple comparisons. They
 quantify run-to-run uncertainty rather than establish universal effects.
 
 \textbf{Scripted demonstrations.} Programmatic defects provide exact control
-but do not capture the full diversity or temporal dependence of human data-
-collection errors.
+but do not capture the full diversity or temporal dependence of human
+data-collection errors.
 
 \section{Conclusion}
 
 Treating demonstration quality as the independent variable reveals both
-stable and policy-dependent effects. Accidental-success data is catastrophic
-near full contamination and corrective flailing is consistently benign, but
-occlusion and truncation exchange rank across the MLP and Extra Trees. The
-practical hypothesis is therefore interaction-aware: QC effort should depend
-on both defect type and the intended learner.
+stable and policy-dependent effects that cannot be reduced to action-label
+fidelity. Accidental-success and occlusion demonstrations disagree similarly
+with the primary expert but produce radically different MLP policies;
+occlusion and truncation also exchange rank across the MLP and Extra Trees.
+The defensible result is therefore narrower than a universal hierarchy:
+accidental success has a late cliff, while QC priority in the middle depends
+on defect structure and the intended learner.
 
-The evaluation result is equally important: open-loop action-prediction error
-has a strong pooled association with closed-loop success, yet its diagnostic
-value varies substantially by failure mode. The transition-matched analysis
-also turns an apparent inconsistency penalty into a clonability result.
-Offline screening and endpoint controls are useful, but neither substitutes
-for closed-loop validation.
+The similar-MSE band is the main evaluation result: nearly equal offline
+scores coexist with success from $0.130$ to $0.995$. Correlations are only
+descriptive because seed and contamination observations are nested and some
+modes have restricted outcome ranges. Finally, transition matching and a
+state-only oracle turn an apparent strategy-conflict or observation-aliasing
+effect into a clonability result. Offline screening remains useful, but it
+does not substitute for closed-loop validation.
 
 \section*{Reproducibility statement}
 
@@ -403,7 +482,7 @@ scripts used to generate all three figures are available at
 records the software requirements and commands needed to reproduce all 640
 policy fits and rebuild this manuscript.
 
-\begin{thebibliography}{9}
+\begin{thebibliography}{99}
 \small
 \setlength{\itemsep}{0pt}
 \bibitem{pomerleau1989alvinn}
@@ -417,6 +496,27 @@ Structured Prediction to No-Regret Online Learning. \textit{AISTATS}, 2011.
 \bibitem{mandlekar2021what}
 A.~Mandlekar et al. What Matters in Learning from Offline Human
 Demonstrations for Robot Manipulation. \textit{CoRL}, 2021.
+
+\bibitem{wu2019imperfect}
+Y.-H. Wu, N.~Charoenphakdee, H.~Bao, V.~Tangkaratt, and M.~Sugiyama.
+Imitation Learning from Imperfect Demonstration. \textit{ICML}, 2019.
+
+\bibitem{wang2021weight}
+Y.~Wang, C.~Xu, B.~Du, and H.~Lee. Learning to Weight Imperfect
+Demonstrations. \textit{ICML}, 2021.
+
+\bibitem{xu2022dwbc}
+H.~Xu, X.~Zhan, H.~Yin, and H.~Qin. Discriminator-Weighted Offline Imitation
+Learning from Suboptimal Demonstrations. \textit{ICML}, 2022.
+
+\bibitem{kuhar2023discern}
+S.~Kuhar, S.~Cheng, S.~Chopra, M.~Bronars, and D.~Xu. Learning to Discern:
+Imitating Heterogeneous Human Demonstrations with Preference and
+Representation Learning. \textit{CoRL}, 2023.
+
+\bibitem{du2023retrieval}
+M.~Du, S.~Nair, D.~Sadigh, and C.~Finn. Behavior Retrieval: Few-Shot
+Imitation Learning by Querying Unlabeled Datasets. \textit{RSS}, 2023.
 
 \bibitem{belkhale2023data}
 S.~Belkhale, Y.~Cui, and D.~Sadigh. Data Quality in Imitation Learning.

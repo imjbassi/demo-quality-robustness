@@ -27,6 +27,8 @@ MARKER = dict(zip(ORDER, ["o", "s", "^", "D", "P"]))
 RESULTS = "results/results.csv"
 TREE_RESULTS = "results/results_tree.csv"
 CONTROL_RESULTS = "results/control_results.csv"
+LABEL_FIDELITY_RESULTS = "results/label_fidelity.csv"
+ALT_CLONABILITY_RESULTS = "results/alternate_clonability.csv"
 T95_10 = 2.262157  # two-sided 95% Student-t critical value, df=9
 
 
@@ -51,6 +53,16 @@ def load_controls(path=CONTROL_RESULTS):
                 row[key] = float(row[key])
             row["seed"] = int(row["seed"])
             rows.append(row)
+    return rows
+
+
+def load_numeric_csv(path):
+    with open(path, encoding="utf-8") as stream:
+        rows = list(csv.DictReader(stream))
+    for row in rows:
+        for key, value in row.items():
+            if key not in ("corruption", "policy"):
+                row[key] = float(value)
     return rows
 
 
@@ -211,15 +223,17 @@ def main():
 
     # ---- statistics -------------------------------------------------------
     lines = []
-    lines.append("## Per-mode correlation between open-loop MSE and closed-loop success\n")
-    lines.append("| corruption mode | Pearson r | Spearman rho | success @ ρ=0.5 | success @ ρ=1.0 |")
+    lines.append("## Descriptive within-mode association and range restriction\n")
+    lines.append("The 60 points per mode are nested within ten seeds and six "
+                 "contamination levels; correlations are descriptive, not "
+                 "independent-sample tests.\n")
+    lines.append("| corruption mode | Pearson r | Spearman rho | MSE SD | success SD |")
     lines.append("|---|---|---|---|---|")
     for c in ORDER:
         x = [r["open_loop_mse"] for r in rows if r["corruption"] == c]
         y = [r["closed_loop_success"] for r in rows if r["corruption"] == c]
         lines.append(f"| {LABEL[c]} | {pearson(x, y):+.2f} | {spearman(x, y):+.2f} | "
-                     f"{A[(c, 0.5)]['closed_loop_success'][0]:.3f} | "
-                     f"{A[(c, 1.0)]['closed_loop_success'][0]:.3f} |")
+                     f"{np.std(x, ddof=1):.4f} | {np.std(y, ddof=1):.4f} |")
     unique_rows = ([r for r in rows if r["rho"] > 0] +
                    [r for r in rows
                     if r["corruption"] == ORDER[0] and r["rho"] == 0])
@@ -288,6 +302,32 @@ def main():
                 f"| {rho} | {mlp[0]:.3f} ± {mlp[2]:.3f} | "
                 f"{trees[0]:.3f} ± {trees[2]:.3f} |"
             )
+
+    if os.path.exists(LABEL_FIDELITY_RESULTS):
+        fidelity_rows = load_numeric_csv(LABEL_FIDELITY_RESULTS)
+        lines.append("\n## Label fidelity at full contamination\n")
+        lines.append("MSE compares each logged action with the primary expert's "
+                     "action on that same logged observation.\n")
+        lines.append("| corruption | label-fidelity MSE (mean ± SD) |")
+        lines.append("|---|---|")
+        for c in ["clean", *ORDER]:
+            values = [row["label_fidelity_mse"] for row in fidelity_rows
+                      if row["corruption"] == c]
+            mean, sd, _ = summarize(values)
+            label = "Clean" if c == "clean" else LABEL[c]
+            lines.append(f"| {label} | {mean:.4f} ± {sd:.4f} |")
+
+    if os.path.exists(ALT_CLONABILITY_RESULTS):
+        alt_rows = load_numeric_csv(ALT_CLONABILITY_RESULTS)
+        lines.append("\n## Alternate-strategy observation-adequacy diagnostic\n")
+        lines.append("The alternate oracle is a deterministic function of the "
+                     "current 10-D observation, so the strategy is Markovian "
+                     "in the recorded state.\n")
+        for metric in ("train_mse_alt", "heldout_mse_alt", "clone_success",
+                       "oracle_success"):
+            mean, sd, ci = summarize([row[metric] for row in alt_rows])
+            lines.append(f"- {metric}: {mean:.4f} ± {ci:.4f} (95% t interval; "
+                         f"SD {sd:.4f})")
 
     lines.append(clonability_control())
     open("results/findings.md", "w", encoding="utf-8").write("\n".join(lines) + "\n")

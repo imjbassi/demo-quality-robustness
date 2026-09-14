@@ -46,8 +46,11 @@ failure mode open-loop metrics are worst at surfacing.
 
 **Expert.** A hand-coded orbit-then-push controller. Success rate: **100.0%**.
 
-**Policies.** A 2×256 MLP trained by MSE behaviour cloning for 50 epochs and
-an Extra Trees regressor with 40 trees. Both use the same 400-episode datasets.
+**Policies.** A 2×256 ReLU MLP trained by MSE behaviour cloning for 50 epochs
+with Adam (learning rate 1e-3, batch size 256, no weight decay), and an Extra
+Trees regressor with 40 trees and minimum leaf size two. Both use the same
+400-episode datasets, spanning 5,957–19,180 transitions depending on defect and
+contamination level; clean datasets average 12,207 transitions.
 
 **Sweep axis: contamination rate ρ**, not per-episode severity. Every dataset
 has the same number of episodes; ρ of them are bad, (1−ρ) are clean.
@@ -84,19 +87,26 @@ control fixes 13,000 total transitions and defines ρ at transition level.
 MLP clean baseline: **0.949 ± 0.015** closed-loop success (mean ± 95% t-interval
 half-width). Extra Trees clean baseline: **0.996 ± 0.003**.
 
-| Mode | ρ=0.5 | ρ=1.0 | Pearson r (MSE ↔ success) |
-|---|---|---|---|
-| Truncated episodes | 0.940 | 0.962 | −0.13 |
-| Corrective flailing | 0.963 | 0.965 | −0.26 |
-| Occlusion | 0.905 | 0.866 | −0.64 |
-| Inconsistent strategy | 0.934 | 0.229 | −0.89 |
-| Accidental success | 0.939 | **0.009** | −0.95 |
+| Mode | Label-fidelity MSE | ρ=0.5 success | ρ=1.0 success |
+|---|---:|---:|---:|
+| Truncated episodes | 0.000 | 0.940 | 0.962 |
+| Corrective flailing | 0.066 | 0.963 | 0.965 |
+| Occlusion | 0.212 | 0.905 | 0.866 |
+| Inconsistent strategy | 0.475 | 0.934 | 0.229 |
+| Accidental success | 0.207 | 0.939 | **0.009** |
 
-### 1. Failure modes are not interchangeable, and the ranking is not intuitive
+### 1. The ranking is not a restatement of label fidelity
 
 At full contamination, the MLP's paired change from clean is **+0.016 ±
 0.022** for corrective flailing and **−0.940 ± 0.020** for accidental success.
 These are both "bad demos" in a practical taxonomy.
+
+Label fidelity compares each logged action with the primary expert's action on
+that same logged state. Accidental-success and occlusion data have essentially
+the same label MSE (0.207 and 0.212), but full-contamination MLP success differs
+by 0.857. Inconsistent-strategy data has the worst label fidelity (0.475) yet
+clones far better than accidental-success data. The ranking is therefore not
+monotone in retained primary-expert action information.
 
 **Corrective flailing causes no detectable loss here.** Jitter-then-recover
 trajectories may provide DAgger-like off-distribution state coverage, but the
@@ -111,16 +121,18 @@ genuinely correct demonstrations masks the problem completely, right up until
 it doesn't. A pipeline monitoring average success-labelled throughput sees
 nothing coming.
 
-### 3. Open-loop MSE looks predictive in aggregate and isn't, per mode
-
-Pooled across all 260 MLP fits: **r = −0.92**.
-
-Broken out by failure mode: **−0.13 to −0.95**. For truncation and flailing the
-offline metric carries essentially no signal about closed-loop behaviour.
+### 3. Similar open-loop scores do not identify rollout performance
 
 Among the 49 runs whose open-loop MSE lands in the descriptive band
 [0.20, 0.30], closed-loop success spans **0.130 to 0.995**. This illustrates
 similar numerical scores; it is not a statistical equivalence test.
+
+Pooled correlation across all 260 MLP fits is **r = −0.92**, while descriptive
+within-mode coefficients range from −0.13 to −0.95. Those 60 points per mode
+are nested within ten seeds and six contamination levels, not independent
+draws. Truncation and flailing also have restricted success SDs (0.029 and
+0.030), so their weak correlations are secondary context rather than the main
+claim.
 
 ![Open-loop vs closed-loop](results/fig2_openloop_vs_closedloop.png)
 
@@ -139,8 +151,8 @@ similar numerical scores; it is not a statistical equivalence test.
 | Accidental success | **0.009 ± 0.008** | **0.002 ± 0.003** |
 
 Accidental success remains catastrophic and corrective flailing remains
-benign. Occlusion and truncation exchange rank across policies, so quality-
-control priorities must account for the intended learner.
+benign. Occlusion and truncation exchange rank across policies, so
+quality-control priorities must account for the intended learner.
 
 ### Transition matching rejects the strategy-conflict explanation
 
@@ -154,6 +166,16 @@ mixture performs above the line connecting its two endpoints.
 
 The apparent inconsistent-strategy penalty is therefore dominated by the
 alternate strategy's lower clonability, not by conflict between strategies.
+
+The alternate expert is **not non-Markovian**: its action is an explicit,
+deterministic function of the current 10-D observation, and that state-only
+oracle succeeds on all 2,000 diagnostic rollouts. Its MLP clone nevertheless
+has low held-out error on alternate trajectories (0.0568 ± 0.0041, 95%
+t-interval half-width) and only 0.229 ± 0.102 rollout success. The observation
+is sufficient for the expert; one-step regression is not sufficient for a
+robust closed-loop clone. This is consistent with compounding error or
+sensitivity near controller switching boundaries, but the current diagnostic
+does not distinguish those mechanisms.
 
 ---
 
@@ -187,6 +209,7 @@ demo-quality-robustness/
 ├── policy.py                 MLP + Extra Trees policies and evaluations
 ├── run_experiment.py         main grid runner
 ├── run_controls.py           transition-matched strategy controls
+├── run_diagnostics.py        label-fidelity + alternate-clonability checks
 ├── analyze.py                stats and figures  →  results/findings.md, results/*.png
 ├── make_demo_gif.py          renders one expert episode →  results/demo.gif
 │
@@ -197,6 +220,8 @@ demo-quality-robustness/
     ├── results.csv           MLP results (310 rows; 260 independent fits)
     ├── results_tree.csv      Extra Trees results (same design)
     ├── control_results.csv   120 transition-matched control fits
+    ├── label_fidelity.csv    per-mode expert-label disagreement
+    ├── alternate_clonability.csv  state-only oracle and clone diagnostics
     ├── findings.md           generated statistics tables
     ├── fig1_dose_response.png
     ├── fig2_openloop_vs_closedloop.png
@@ -214,13 +239,14 @@ point to someone reading it in a browser without a clone or an install.
 ## Reproducing
 
 ```bash
-git clone https://github.com/<user>/demo-quality-robustness
+git clone https://github.com/imjbassi/demo-quality-robustness
 cd demo-quality-robustness
 pip install -r requirements.txt
 
 python run_experiment.py --policy mlp --out results/results.csv
 python run_experiment.py --policy trees --out results/results_tree.csv
 python run_controls.py
+python run_diagnostics.py
 python analyze.py          # findings.md and all three figures
 ```
 

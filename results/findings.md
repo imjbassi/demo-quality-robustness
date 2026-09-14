@@ -1,12 +1,14 @@
-## Per-mode correlation between open-loop MSE and closed-loop success
+## Descriptive within-mode association and range restriction
 
-| corruption mode | Pearson r | Spearman rho | success @ ρ=0.5 | success @ ρ=1.0 |
+The 60 points per mode are nested within ten seeds and six contamination levels; correlations are descriptive, not independent-sample tests.
+
+| corruption mode | Pearson r | Spearman rho | MSE SD | success SD |
 |---|---|---|---|---|
-| Occlusion (stale obs) | -0.64 | -0.67 | 0.905 | 0.866 |
-| Accidental success | -0.95 | -0.73 | 0.939 | 0.009 |
-| Corrective flailing | -0.26 | +0.03 | 0.963 | 0.965 |
-| Truncated episodes | -0.13 | -0.06 | 0.940 | 0.962 |
-| Inconsistent strategy | -0.89 | -0.85 | 0.934 | 0.229 |
+| Occlusion (stale obs) | -0.64 | -0.67 | 0.0257 | 0.0460 |
+| Accidental success | -0.95 | -0.73 | 0.1174 | 0.3471 |
+| Corrective flailing | -0.26 | +0.03 | 0.0074 | 0.0298 |
+| Truncated episodes | -0.13 | -0.06 | 0.0105 | 0.0290 |
+| Inconsistent strategy | -0.89 | -0.85 | 0.0705 | 0.3116 |
 
 Pooled across all modes: Pearson r = -0.92, Spearman rho = -0.66
 
@@ -129,6 +131,28 @@ Among the 49 runs whose open-loop MSE falls in [0.2, 0.3] — a descriptive simi
 | 0.75 | 0.741 ± 0.096 | 0.797 ± 0.026 |
 | 0.9 | 0.386 ± 0.099 | 0.563 ± 0.051 |
 | 1.0 | 0.141 ± 0.064 | 0.226 ± 0.034 |
+
+## Label fidelity at full contamination
+
+MSE compares each logged action with the primary expert's action on that same logged observation.
+
+| corruption | label-fidelity MSE (mean ± SD) |
+|---|---|
+| Clean | 0.0000 ± 0.0000 |
+| Occlusion (stale obs) | 0.2124 ± 0.0072 |
+| Accidental success | 0.2068 ± 0.0061 |
+| Corrective flailing | 0.0659 ± 0.0009 |
+| Truncated episodes | 0.0000 ± 0.0000 |
+| Inconsistent strategy | 0.4751 ± 0.0087 |
+
+## Alternate-strategy observation-adequacy diagnostic
+
+The alternate oracle is a deterministic function of the current 10-D observation, so the strategy is Markovian in the recorded state.
+
+- train_mse_alt: 0.0519 ± 0.0044 (95% t interval; SD 0.0062)
+- heldout_mse_alt: 0.0568 ± 0.0041 (95% t interval; SD 0.0057)
+- clone_success: 0.2295 ± 0.1021 (95% t interval; SD 0.1427)
+- oracle_success: 1.0000 ± 0.0000 (95% t interval; SD 0.0000)
 
 ## Clonability control for inconsistent strategy
 

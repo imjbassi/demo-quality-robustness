@@ -5,15 +5,17 @@ abstract: >-
   A controlled simulation study treating demonstration quality as the
   independent variable. Five failure modes are injected at controlled
   contamination rates into behaviour-cloning datasets for a 2D block-pushing
-  task. Across two policy families, ten paired seeds, and transition-matched
-  controls, the study compares open-loop error with closed-loop task success.
+  task. Across two policy families, ten paired seeds, label-fidelity
+  diagnostics, and transition-matched controls, the study shows that defect
+  cost is not monotone in retained expert action information and that similar
+  open-loop errors can accompany widely different closed-loop success.
 authors:
   - given-names: Jaiveer
     family-names: Bassi
     affiliation: Independent Researcher, USA
     email: jaiveerbassi@yahoo.com
     orcid: "https://orcid.org/0009-0006-3633-3220"
-version: "2.0.0"
+version: "2.1.0"
 date-released: "2026-09-14"
 license: MIT
 keywords:
