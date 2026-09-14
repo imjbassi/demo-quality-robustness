@@ -41,11 +41,12 @@ Closed-Loop Policy Performance}
 We isolate five demonstration defects in a controlled 2D block-pushing task
 while holding task, dataset size, and training protocol fixed. Across 660
 policy fits, ten paired seeds, two policy families, and transition-matched
-controls, defect cost is not determined by retained primary-expert action
-information. At full contamination, accidental-success and occlusion data
-have nearly equal label-fidelity MSE ($0.207$ and $0.212$), yet MLP rollout
-success is $0.009$ and $0.866$; inconsistent-strategy data has worse label
-fidelity ($0.475$) but higher success ($0.229$). Thus the robust result is not
+controls, defect cost is not determined by primary-expert disagreement
+measured conditional on logged observations. At full contamination,
+accidental-success and occlusion data have nearly equal conditional-disagreement
+MSE ($0.207$ and $0.212$), yet MLP rollout
+success is $0.009$ and $0.866$; inconsistent-strategy data has larger
+conditional disagreement ($0.475$) but higher success ($0.229$). Thus the robust result is not
 merely that low-fidelity labels are harmful: accidental success exhibits a
 late cliff, while the middle ranking changes with policy class. Matching
 truncated datasets to clean transition counts leaves Extra Trees success at
@@ -104,8 +105,9 @@ variable across five failure modes, ten paired seeds, and two policy families.
 not monotone in disagreement with the primary expert.
 \item A similar-offline-score comparison showing that open-loop MSE does not
 uniquely identify closed-loop success; nested correlations are secondary.
-\item Policy-, transition-, and state-only-oracle controls separating defect
-effects, strategy mixing, observation adequacy, and clonability.
+\item Policy-family and state-only-oracle controls, plus transition-matched
+strategy and sample-matched truncation controls, separating defect effects,
+strategy mixing, sample count, observation adequacy, and clonability.
 \end{enumerate}
 
 \section{Method}
@@ -226,7 +228,13 @@ Two diagnostics address alternative explanations. \textbf{Label fidelity} is
 the MSE between each logged demonstration action and the primary expert's
 action evaluated on that same logged observation, summarized over ten
 independently generated full-contamination datasets per mode. This quantity
-measures retained primary-expert action information, not trajectory success.
+is conditional on the \emph{logged} observation, not the demonstrator's true
+state. Under occlusion, therefore, it does not measure corrupted action labels:
+the logged actions are exactly expert, but re-evaluating the expert on a frozen
+stale frame produces disagreement through the input channel. A single scalar
+score consequently conflates wrong-state and wrong-action defects; its failure
+to identify downstream damage is part of the diagnostic result, not evidence
+that the two modes lose the same action information.
 For the alternate strategy, we also evaluate cloned-policy MSE on 300 held-out
 alternate-expert episodes and compare its rollout success with the original
 state-only alternate controller on the same evaluation seeds.
@@ -249,7 +257,7 @@ The MLP clean baseline reaches $0.949\pm0.015$ closed-loop success (mean and
 95\% t-interval half-width); the Extra Trees baseline reaches
 $0.996\pm0.003$.
 
-\subsection{The ranking is not explained by label fidelity}
+\subsection{The ranking is not explained by conditional disagreement}
 
 Table~\ref{tab:main} gives the headline comparison. At full contamination,
 corrective flailing changes MLP mean success by $+0.016\pm0.022$ relative to
@@ -260,15 +268,18 @@ sharply.
 
 That contrast alone could be tautological because flailing retains mostly
 expert actions whereas accidental success does not. The explicit fidelity
-control rejects a one-dimensional explanation. Accidental-success and
-occlusion labels have nearly identical disagreement with the primary expert
-($0.207$ versus $0.212$ MSE), but their full-contamination success differs by
-$0.857$. Inconsistent-strategy labels disagree most ($0.475$) yet clone far
+control rejects a one-dimensional explanation. Accidental success and
+occlusion have nearly identical conditional-disagreement scores for
+structurally different reasons: the former contains nonexpert actions on valid
+states, whereas the latter pairs exact expert actions with stale states
+($0.207$ versus $0.212$ MSE). Their full-contamination success nevertheless
+differs by $0.857$. Inconsistent-strategy actions disagree most ($0.475$) yet clone far
 better than accidental-success data. Truncation has essentially perfect label
 fidelity but is benign for the MLP and damaging for Extra Trees
-(Section~\ref{sec:controls}). Performance is therefore not monotone in retained
-primary-expert action information. The narrower robust claim is the accidental
-success cliff and a policy-dependent middle ranking.
+(Section~\ref{sec:controls}). Conditional expert disagreement therefore cannot
+serve as a one-dimensional quality score across defect channels. The narrower
+robust claim is the accidental-success cliff and a policy-dependent middle
+ranking.
 
 \textbf{Corrective flailing causes little degradation in this setting.}
 Jitter-then-recover trajectories may provide DAgger-like coverage of
@@ -449,9 +460,11 @@ state distribution and action targets.
 
 Clone-oracle MSE on states visited by the clone rises to $0.0810\pm0.0260$, a
 43\% mean increase over held-out alternate-expert states. It is $0.0683$ over
-steps 0--19 and $0.0859$ over steps 90--109. The largest state-weighted excess
-is distributed through the orbit phase ($0.087$ on-policy versus $0.056$ on
-expert states), rather than spiking at the stage or push switches. The paired
+steps 0--19 and $0.0859$ over steps 90--109. Phase categories do not align with
+fixed step windows because trajectories enter and leave orbit at
+state-dependent times. The largest state-weighted excess is distributed
+through the orbit phase ($0.087$ on-policy versus $0.056$ on expert states),
+rather than spiking at the stage or push switches. The paired
 error increases have wide intervals that include zero, so this pattern favors,
 but does not prove, covariate shift and compounding error over a narrow
 switching-boundary failure. Observation is sufficient for the scripted expert;
@@ -483,9 +496,10 @@ data-collection errors.
 \section{Conclusion}
 
 Treating demonstration quality as the independent variable reveals both
-stable and policy-dependent effects that cannot be reduced to action-label
-fidelity. Accidental-success and occlusion demonstrations disagree similarly
-with the primary expert but produce radically different MLP policies;
+stable and policy-dependent effects that cannot be reduced to scalar
+conditional expert disagreement. Accidental-success and occlusion
+demonstrations achieve similar disagreement scores for different structural
+reasons and produce radically different MLP policies;
 occlusion and truncation also exchange rank across the MLP and Extra Trees.
 The sample-matched truncation control preserves that swap. The defensible
 result is therefore narrower than a universal hierarchy:

@@ -103,11 +103,16 @@ At full contamination, the MLP's paired change from clean is **+0.016 ±
 These are both "bad demos" in a practical taxonomy.
 
 Label fidelity compares each logged action with the primary expert's action on
-that same logged state. Accidental-success and occlusion data have essentially
-the same label MSE (0.207 and 0.212), but full-contamination MLP success differs
-by 0.857. Inconsistent-strategy data has the worst label fidelity (0.475) yet
-clones far better than accidental-success data. The ranking is therefore not
-monotone in retained primary-expert action information.
+that same logged observation. It is therefore a conditional-disagreement
+score, not a direct measure of corrupted action labels. For occlusion the
+logged actions are exactly expert; its 0.212 score arises because the expert is
+re-evaluated on a frozen stale frame. Accidental success reaches a nearly equal
+score (0.207) for the structurally different reason that it contains nonexpert
+actions on valid states, yet full-contamination MLP success differs by 0.857.
+Inconsistent-strategy data has the highest disagreement (0.475) but clones far
+better than accidental-success data. A scalar score conditional on logged
+observations cannot distinguish wrong-state from wrong-action defects or
+identify their downstream cost.
 
 **Corrective flailing causes no detectable loss here.** Jitter-then-recover
 trajectories may provide DAgger-like off-distribution state coverage, but the
@@ -186,9 +191,11 @@ success is 0.949 ± 0.015, although the two MSEs use different expert state
 distributions and action targets and are not directly comparable.
 
 On clone-visited states, alternate-oracle MSE rises to 0.0810 ± 0.0260—43%
-above the held-out mean—and later-step error exceeds early-step error. The
-largest excess is spread across the orbit phase rather than concentrated at
-the stage or push switches. Seed intervals remain wide, so this favors but
+above the held-out mean—and later-step error exceeds early-step error. Because
+trajectories enter and leave orbit at state-dependent times, controller phases
+do not map directly onto fixed step windows. The largest excess is spread
+across the orbit phase rather than concentrated at the stage or push switches.
+Seed intervals remain wide, so this favors but
 does not prove covariate shift and compounding error over a narrow switching
 boundary. The observation is sufficient for the expert; one-step regression
 is not sufficient for a robust closed-loop clone.
