@@ -249,11 +249,15 @@ demo-quality-robustness/
 ├── analyze.py                stats and figures  →  results/findings.md, results/*.png
 ├── make_demo_gif.py          renders one expert episode →  results/demo.gif
 │
-├── viz/                      results video: real rollouts of checkpointed policies
+├── viz/                      results videos: real rollouts of checkpointed policies
 │   ├── train_video_policies.py  retrain + reproduction gate → viz/checkpoints/
-│   ├── make_video.py            render 1080p MP4 + README GIF from checkpoints
+│   ├── make_video.py            dose-response video (accidental success vs flailing)
+│   ├── make_video2.py           compounding-error video (open-loop ghost vs closed-loop)
+│   ├── common.py                shared palette, panels, recording, encoding
 │   ├── Makefile                 `make -C viz all` regenerates everything
-│   └── README.md                details, seeds, and the out-of-scope 3D note
+│   ├── README.md                details, seeds, selection rules, and the 3D note
+│   ├── checkpoints/             gated .pt policies + manifest.json (committed)
+│   └── media/                   the rendered MP4s and README GIFs (committed)
 │
 ├── paper.tex                 LaTeX source (two-column, self-contained, no bibtex)
 ├── paper.pdf                 compiled paper
@@ -295,6 +299,13 @@ python run_truncation_control.py
 python run_diagnostics.py
 python analyze.py          # findings.md and all three figures
 ```
+
+To regenerate the two result videos (requires `ffmpeg` on PATH): retrain the
+checkpointed video policies and re-render with `make -C viz all`, or
+re-render from the committed checkpoints with `make -C viz video`. Both
+renderers refuse to run unless the retrained policies reproduce their
+committed rows in `results/results.csv`; see [viz/README.md](viz/README.md)
+for the gate, the fixed seeds, and the pair-selection rule.
 
 Training seeds are fixed at 0–9. Evaluation seed `12345 + s` is used for
 training seed `s`, so evaluation states vary across seeds while remaining
