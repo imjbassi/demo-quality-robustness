@@ -161,10 +161,11 @@ class CompoundPanel(Panel):
         (self.ghost_dots,) = ax.plot([], [], "o", color=BLUE, ms=5,
                                      alpha=GHOST_ALPHA, zorder=2,
                                      markeredgewidth=0, ls="none")
-        # top-center is occupied by the legend here; anchor the wrong-side
-        # tag top-right instead
-        self.wrong_tag.set_position((0.97, 0.955))
+        # the legend occupies the top of the panel here; anchor the
+        # wrong-side tag bottom-right instead
+        self.wrong_tag.set_position((0.97, 0.115))
         self.wrong_tag.set_ha("right")
+        self.wrong_tag.set_va("bottom")
         self.div_ax = div_ax
         div_ax.set_facecolor(SURFACE)
         for s in ["top", "right"]:
