@@ -1,7 +1,7 @@
-# Regenerate the results video. Run from the repository root or from viz/:
+# Regenerate the results videos. Run from the repository root or from viz/:
 #
-#   make -C viz all        train checkpoints (if missing) + render video
-#   make -C viz video      render from existing checkpoints (one command)
+#   make -C viz all        train checkpoints (if missing) + render both videos
+#   make -C viz video      one command: re-render both videos from checkpoints
 #   make -C viz clean      remove rendered media (checkpoints kept)
 
 PY ?= python3
@@ -14,8 +14,10 @@ checkpoints/manifest.json:
 
 video:
 	cd $(ROOT) && $(PY) viz/make_video.py
+	cd $(ROOT) && $(PY) viz/make_video2.py
 
 clean:
-	rm -f media/demo_quality_video.mp4 media/main_shot.gif
+	rm -f media/demo_quality_video.mp4 media/main_shot.gif \
+	      media/compounding_error_video.mp4 media/matched_mse.gif
 
 .PHONY: all video clean
