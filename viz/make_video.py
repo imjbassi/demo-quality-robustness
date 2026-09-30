@@ -203,7 +203,7 @@ class Panel:
                                           capstyle="round")
         ax.add_collection(self.grip_trail)
         ax.add_collection(self.block_trail)
-        label = "clean data" if rho == 0 else f"ρ = {rho:g}"
+        label = "clean data" if rho == 0 else f"ρ = {rho}"
         ax.set_title(label, color=INK, fontsize=17, pad=26,
                      fontfamily="sans-serif", fontweight="bold")
         self.sub = ax.text(0.5, 1.015, f"success rate {success_rate:.2f}",
@@ -265,20 +265,21 @@ def build_info_axis(ax, title_lines, mode_key, means, series_color):
     ax.set_xticks([])
     ax.set_yticks([])
     y = 0.97
-    for i, line in enumerate(title_lines):
+    for i, line in enumerate(title_lines[:3]):
         ax.text(0.03, y, line, transform=ax.transAxes, va="top",
                 color=INK if i == 0 else SECONDARY,
                 fontsize=16 if i == 0 else 12.5,
                 fontweight="bold" if i == 0 else "normal", wrap=True)
         y -= 0.085 if i == 0 else 0.062
-    ax.text(0.03, 0.30,
-            f"same {N_STATES} initial states in every panel\n"
-            f"(env seed {INIT_SEED}, fixed a priori)\n"
+    ax.text(0.03, 0.285,
+            f"every panel: the same {N_STATES} initial states\n"
+            f"(env seed {INIT_SEED}, fixed a priori) — only the\n"
+            "training data differs\n"
             "labels: measured over 200 eval episodes",
             transform=ax.transAxes, va="top", color=MUTED, fontsize=11)
 
     # mini curve: 10-seed mean success vs rho for this mode
-    inset = ax.inset_axes([0.08, 0.36, 0.86, 0.34])
+    inset = ax.inset_axes([0.10, 0.42, 0.84, 0.30])
     inset.set_facecolor(SURFACE)
     rhos_all = [0.0, 0.25, 0.5, 0.75, 0.9, 1.0]
     ys = [means[(mode_key if r > 0 else "clean", r)][0] for r in rhos_all]
@@ -292,8 +293,9 @@ def build_info_axis(ax, title_lines, mode_key, means, series_color):
     inset.tick_params(colors=MUTED, labelsize=9, length=2)
     for s in inset.spines.values():
         s.set_color(GRID)
-    inset.set_xlabel("contamination ρ", color=MUTED, fontsize=10)
-    inset.set_ylabel("success (10-seed mean)", color=MUTED, fontsize=10)
+    inset.set_xlabel("contamination ρ", color=MUTED, fontsize=10,
+                     labelpad=1)
+    inset.set_ylabel("success\n(10-seed mean)", color=MUTED, fontsize=9)
     inset.grid(color=GRID, lw=0.6, alpha=0.7)
     return ax
 
@@ -416,10 +418,7 @@ def main():
         "accidental_success", entries, manifest, means, BLUE,
         ["Accidental success",
          "demos that reached the goal by luck,",
-         "not by correct behaviour",
-         "",
-         "every panel: the same initial states,",
-         "only the training data differs"])
+         "not by correct behaviour"])
     sw.render("main", fig,
               lambda w: render_grid_shot(w, fig, panels, None,
                                          rolls_for("accidental_success"),
@@ -432,10 +431,7 @@ def main():
         "flailing", entries, manifest, means, ORANGE,
         ["Corrective flailing",
          "demos that wobble hard at the start,",
-         "then recover and succeed",
-         "",
-         "same initial states, same sweep —",
-         "and the policy barely cares"])
+         "then recover and succeed"])
     sw.render("contrast", fig,
               lambda w: render_grid_shot(w, fig, panels, None,
                                          rolls_for("flailing"),
