@@ -8,3 +8,6 @@ venv/
 *.aux
 *.log
 *.out
+
+# keep the video checkpoints (small MLPs) despite the global *.pt rule
+!viz/checkpoints/*.pt
