@@ -161,6 +161,10 @@ class CompoundPanel(Panel):
         (self.ghost_dots,) = ax.plot([], [], "o", color=BLUE, ms=5,
                                      alpha=GHOST_ALPHA, zorder=2,
                                      markeredgewidth=0, ls="none")
+        # top-center is occupied by the legend here; anchor the wrong-side
+        # tag top-right instead
+        self.wrong_tag.set_position((0.97, 0.955))
+        self.wrong_tag.set_ha("right")
         self.div_ax = div_ax
         div_ax.set_facecolor(SURFACE)
         for s in ["top", "right"]:
@@ -235,6 +239,10 @@ def render_compound_shot(writer, panels, episodes, counter, frames_per_step,
     for k, (ep, seg) in enumerate(episodes, 1):
         for p in panels:
             p.prepare(ep, seg)
+        # shared divergence scale so side-by-side panels compare honestly
+        top = max(p.panel.div_ax.get_ylim()[1] for p in panels)
+        for p in panels:
+            p.panel.div_ax.set_ylim(0, top)
         for t in range(seg + 1):
             for p in panels:
                 p.draw_step(t)
